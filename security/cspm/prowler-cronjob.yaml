@@ -1,0 +1,108 @@
+---
+# AWS CSPM. Prowler scans the account against CIS AWS Foundations (and SOC2,
+# PCI, etc.) and catches drift that IaC scanning cannot see: a manual console
+# change, a role edited outside Terraform, a bucket opened by hand. This is the
+# posture layer that complements checkov/trivy on the IaC in CI.
+#
+# Unlike kube-bench, Prowler is read-only and needs no host access, so it runs
+# policy-clean (non-root, read-only rootfs, dropped caps) and lives in a
+# restricted namespace, satisfying the same admission controls the app does.
+#
+# Alternative: ScoutSuite (nccgroup/scoutsuite) covers the same ground with an
+# HTML report model. Prowler is chosen for its native compliance frameworks and
+# S3/Security Hub output.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+# IRSA. The role grants the AWS-managed SecurityAudit + ViewOnlyAccess policies
+# (read-only account inspection) plus s3:PutObject on the findings bucket. The
+# role and the bucket are provisioned in terraform/ (out of scope here); the ARN
+# and bucket name below are placeholders wired to real values there, same as
+# <acct> elsewhere.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prowler
+  namespace: security
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<acct>:role/nimbus-prowler-cspm
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: prowler-aws
+  namespace: security
+  labels:
+    app.kubernetes.io/name: prowler
+    app.kubernetes.io/component: cspm
+spec:
+  # Weekly, Monday 02:00. Posture drift is slow; a nightly run is noise.
+  schedule: "0 2 * * 1"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: prowler
+        spec:
+          serviceAccountName: prowler
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: prowler
+              image: docker.io/toniblyx/prowler:5.37.1
+              args:
+                - aws
+                - --compliance
+                - cis_3.0_aws
+                - --output-modes
+                - csv,json-ocsf,html
+                # -D uploads with the pod's IRSA credentials instead of
+                # assuming a separate role (-B). The IRSA role already carries
+                # both the audit read and the bucket write, so no second hop.
+                - --output-bucket-no-assume
+                - nimbus-security-findings-<acct>
+                # Findings are the expected output, not a job failure. Without
+                # this, prowler exits 3 whenever a control fails and the CronJob
+                # would flap.
+                - --ignore-exit-code-3
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+              volumeMounts:
+                # read-only rootfs: prowler writes its report tree and scratch
+                # to these before the S3 upload.
+                - name: output
+                  mountPath: /home/prowler/output
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: output
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}

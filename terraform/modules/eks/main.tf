@@ -31,6 +31,13 @@ module "eks" {
 
   enable_irsa = true
 
+  # Karpenter (and other platform addons) authenticate via EKS Pod Identity, which
+  # requires this agent running on the cluster. Without it the pod-identity
+  # associations created in modules/platform never resolve credentials.
+  addons = {
+    eks-pod-identity-agent = {}
+  }
+
   authentication_mode                      = "API"
   enable_cluster_creator_admin_permissions = true
 

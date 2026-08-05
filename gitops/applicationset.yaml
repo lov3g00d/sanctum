@@ -1,0 +1,46 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nimbus-orders-api
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: nimbus
+spec:
+  # Prune Applications whose overlay directory disappears from git. Without this,
+  # deleting an overlay leaves an orphaned Application still syncing.
+  syncPolicy:
+    preserveResourcesOnDeletion: false
+
+  generators:
+    # Git directory generator: one element per directory matching the glob, so a
+    # new overlay under kubernetes/overlays/ becomes an Application with no edit
+    # here. path.basename is the leaf dir name (dev, prod) used as the env.
+    - git:
+        repoURL: https://github.com/nimbus-org/nimbus.git
+        revision: main
+        directories:
+          - path: kubernetes/overlays/*
+
+  template:
+    metadata:
+      name: 'nimbus-orders-api-{{path.basename}}'
+      labels:
+        app.kubernetes.io/part-of: nimbus
+        environment: '{{path.basename}}'
+    spec:
+      project: nimbus
+      source:
+        repoURL: https://github.com/nimbus-org/nimbus.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: nimbus
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true

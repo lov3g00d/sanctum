@@ -1,0 +1,61 @@
+---
+# ASPIRATIONAL, ships Audit. This requires an SPDX SBOM to be attached to the
+# image as an in-toto attestation (cosign attest --predicate), then verified at
+# admission. The current pipeline does NOT satisfy this yet: cd.yml runs
+# `cosign sign` but not `cosign attest`, and syft's SBOM is uploaded as a CI
+# artifact, not attached to the image. cd.yml also sets `provenance: true`,
+# which is a BuildKit SLSA provenance attestation, a different predicate that
+# this policy does not check.
+#
+# To make this enforceable, add to cd.yml build-push (out of scope for this
+# track, cicd/ is not modified here):
+#   syft "${IMAGE}@${DIGEST}" -o spdx-json=sbom.spdx.json
+#   cosign attest --yes --predicate sbom.spdx.json \
+#     --type spdxjson "${IMAGE}@${DIGEST}"
+# then flip failureAction to Enforce. Kept Audit so it reports the gap in
+# PolicyReports without blocking any deploy.
+#
+# Same ECR-credentials dependency as verify-images.yaml: the Kyverno SA needs
+# read access to the nimbus ECR repo to fetch the attestation.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-sbom-attestation
+  annotations:
+    policies.kyverno.io/title: Require SPDX SBOM attestation
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: medium
+spec:
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: require-nimbus-sbom
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kube-node-lease
+                - kube-public
+      verifyImages:
+        - imageReferences:
+            - "*.dkr.ecr.eu-central-1.amazonaws.com/nimbus/*"
+          failureAction: Audit
+          # Verify only: do not mutate the digest from an aspirational rule.
+          mutateDigest: false
+          verifyDigest: false
+          attestations:
+            - type: https://spdx.dev/Document
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        subjectRegExp: "^https://github\\.com/nimbus-org/nimbus/\\.github/workflows/cd\\.yml@refs/(heads/main|tags/v.+)$"
+                        issuer: "https://token.actions.githubusercontent.com"
+                        rekor:
+                          url: https://rekor.sigstore.dev

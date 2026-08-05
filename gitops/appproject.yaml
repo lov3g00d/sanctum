@@ -1,0 +1,36 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nimbus
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: nimbus
+spec:
+  description: Delivery scope for nimbus-orders-api and its observability wiring.
+
+  # A source-repo allowlist, not "*": the project can only sync manifests that
+  # originate from the platform's own repo.
+  sourceRepos:
+    - https://github.com/nimbus-org/nimbus.git
+
+  # Two in-cluster destinations only. The app lands in `nimbus`; `monitoring` is
+  # here so an app-owned PrometheusRule or ServiceMonitor can be reconciled by
+  # the same project without widening it to every namespace.
+  destinations:
+    - name: in-cluster
+      server: https://kubernetes.default.svc
+      namespace: nimbus
+    - name: in-cluster
+      server: https://kubernetes.default.svc
+      namespace: monitoring
+
+  # Least privilege at cluster scope: the project may create Namespaces (needed
+  # by the ApplicationSet's CreateNamespace sync option) and nothing else
+  # cluster-scoped. Everything the workload needs is namespaced.
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

@@ -1,5 +1,5 @@
 {
-  description = "Nimbus DevSecOps reference platform - reproducible toolchain";
+  description = "Nimbus Platform - reproducible toolchain";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -30,6 +30,7 @@
             # IaC (trivy covers IaC misconfig scanning via `trivy config`;
             # checkov runs in CI/pre-commit where it installs from pip)
             terraform
+            terragrunt
             tflint
             terraform-docs
             awscli2

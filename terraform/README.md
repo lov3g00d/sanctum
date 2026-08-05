@@ -86,7 +86,7 @@ but not Terragrunt.
 Two deliberate styles live side by side:
 
 - `vpc/` is written from raw `aws_*` resources. It is the teachable version: every
-  subnet, route, and NAT gateway is visible, which is the point in a reference repo.
+  subnet, route, and NAT gateway is visible, which is the point.
 - `eks/` wraps `terraform-aws-modules/eks/aws` at an exact pin (`21.24.1`). Rebuilding
   the EKS control plane, IRSA, and access entries by hand is a lot of surface to get
   wrong, so here the community module is the right call.
@@ -99,7 +99,7 @@ Version pinning is layered:
   on their own.
 - `.terraform.lock.hcl` records exact versions and checksums on top of that. In a real
   deployment it is committed so every teammate resolves byte-identical providers. This
-  study repo gitignores it for cleanliness; commit it for real work.
+  this repo gitignores it for cleanliness; commit it for real work.
 - Community modules are pinned to an exact version, never a range, because a module is
   not covered by the provider lock file.
 

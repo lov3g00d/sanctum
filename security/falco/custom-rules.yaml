@@ -1,0 +1,133 @@
+---
+# Nimbus runtime detection rules, loaded alongside Falco's default ruleset (the
+# platform installs the Falco engine; this file is mounted as a custom rules
+# file). These build on macros and lists that ship in falco_rules.yaml
+# (container, spawned_process, open_write, open_read, outbound, shell_binaries,
+# package_mgmt_binaries), so do not redefine those here or you shadow the
+# defaults.
+#
+# NAMESPACE SCOPING: k8s.ns.name / k8s.pod.name are only populated when Falco
+# runs with the k8smeta plugin (or the container-engine label fallback). Without
+# it those fields are empty and the nimbus_workload macro matches nothing. The
+# rules stay useful cluster-wide via the container macro; namespace scoping just
+# sharpens the output and the app-specific allowlists.
+#
+# These detect what the preventive controls could not stop. Prevention lives in
+# kubernetes/security/ (PSA restricted, read-only rootfs, default-deny
+# NetworkPolicy, drop-all-caps); Falco is the residual-risk layer.
+
+- required_engine_version: 0.37.0
+
+- list: nimbus_shell_parents
+  items: [systemd, containerd-shim, runc, dockerd, docker-init]
+
+# App runs as PID 1 from its image entrypoint (node for orders-api, python for
+# ledger). A shell whose parent is one of these signals an interactive break-in
+# or a webshell, not normal startup.
+- list: nimbus_expected_entrypoints
+  items: [node, python, python3, uvicorn, gunicorn]
+
+- macro: nimbus_workload
+  condition: k8s.ns.name = "nimbus"
+
+# Files that a read-only-rootfs, non-root container has no business writing.
+- list: nimbus_sensitive_write_dirs
+  items: [/etc, /bin, /sbin, /usr/bin, /usr/sbin, /lib, /usr/lib, /boot, /root/.ssh, /var/lib/kubelet/pki]
+
+- macro: write_to_sensitive_dir
+  condition: >
+    open_write and
+    (fd.directory in (nimbus_sensitive_write_dirs) or
+     fd.name pmatch (nimbus_sensitive_write_dirs))
+
+- macro: sa_token_dir
+  condition: fd.name startswith /run/secrets/kubernetes.io/serviceaccount or
+             fd.name startswith /var/run/secrets/kubernetes.io/serviceaccount
+
+# Approximate VPC-internal (10.0.0.0/16) with a string prefix: Falco has no
+# native CIDR operator. Egress outside this range from an app pod is either a
+# NetworkPolicy bypass or exfil. NetworkPolicy default-deny is the real control;
+# this catches the case where it is misconfigured or absent.
+- macro: outbound_offcluster
+  condition: >
+    outbound and
+    not fd.rip startswith "10.0." and
+    not fd.rip startswith "127." and
+    fd.rip != "0.0.0.0"
+
+- rule: Shell spawned in nimbus container
+  desc: >
+    Interactive shell or shell-like binary started inside a running container.
+    Expected images run a language runtime as the entrypoint, never a shell.
+  condition: >
+    spawned_process and container and
+    proc.name in (shell_binaries) and
+    not proc.pname in (nimbus_expected_entrypoints)
+  output: >
+    Shell spawned in container (ns=%k8s.ns.name pod=%k8s.pod.name
+    container=%container.name image=%container.image.repository
+    shell=%proc.name parent=%proc.pname cmdline=%proc.cmdline
+    user=%user.name uid=%user.uid)
+  priority: WARNING
+  tags: [container, shell, mitre_execution, T1059]
+
+- rule: Package manager run in nimbus container
+  desc: >
+    A package manager executed in a running container. Images are built in CI
+    and are immutable at runtime, so apt/apk/pip at runtime means someone is
+    staging tooling on a live pod.
+  condition: >
+    spawned_process and container and
+    proc.name in (package_mgmt_binaries)
+  output: >
+    Package manager run in container (ns=%k8s.ns.name pod=%k8s.pod.name
+    container=%container.name image=%container.image.repository
+    proc=%proc.name cmdline=%proc.cmdline parent=%proc.pname
+    user=%user.name)
+  priority: ERROR
+  tags: [container, process, mitre_execution, T1072]
+
+- rule: Write to sensitive directory in nimbus container
+  desc: >
+    Write to a system path that a read-only-rootfs container should never
+    touch. Persistence, binary planting, or tampering with SSH/kubelet PKI.
+  condition: >
+    write_to_sensitive_dir and container
+  output: >
+    Write below a sensitive directory (ns=%k8s.ns.name pod=%k8s.pod.name
+    container=%container.name image=%container.image.repository
+    file=%fd.name proc=%proc.name cmdline=%proc.cmdline user=%user.name)
+  priority: ERROR
+  tags: [container, filesystem, mitre_persistence, T1543]
+
+- rule: Service account token read by shell in nimbus container
+  desc: >
+    The projected service-account token was read by a shell or package manager
+    rather than the app process. The app reads its own token at startup; a
+    shell reading it is credential theft for API-server access.
+  condition: >
+    open_read and container and
+    sa_token_dir and
+    (proc.name in (shell_binaries) or proc.name in (package_mgmt_binaries))
+  output: >
+    Service account token read by unexpected process (ns=%k8s.ns.name
+    pod=%k8s.pod.name container=%container.name file=%fd.name
+    proc=%proc.name cmdline=%proc.cmdline parent=%proc.pname user=%user.name)
+  priority: WARNING
+  tags: [container, secrets, mitre_credential_access, T1552]
+
+- rule: Unexpected outbound connection from nimbus pod
+  desc: >
+    Egress from an application pod to a destination outside the VPC CIDR. The
+    orders-api talks only to RDS and Redis inside the data subnets; anything
+    off-cluster is a NetworkPolicy bypass or C2/exfil.
+  condition: >
+    nimbus_workload and container and outbound_offcluster and
+    not proc.name in (nimbus_expected_entrypoints)
+  output: >
+    Unexpected outbound connection (ns=%k8s.ns.name pod=%k8s.pod.name
+    container=%container.name image=%container.image.repository
+    proc=%proc.name dest=%fd.rip:%fd.rport cmdline=%proc.cmdline
+    user=%user.name)
+  priority: NOTICE
+  tags: [network, container, mitre_exfiltration, T1041]

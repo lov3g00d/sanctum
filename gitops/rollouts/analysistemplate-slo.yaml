@@ -1,0 +1,42 @@
+---
+# SLO gate for the orders-api canary. Both metrics query the precomputed
+# recording rules (see monitoring/prometheus/rules/recording.rules.yml), which
+# aggregate `by (namespace)`, so `{namespace="nimbus"}` returns a single series
+# and result[0] is well defined.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: orders-api-slo
+  namespace: nimbus
+  labels:
+    app.kubernetes.io/name: nimbus-orders-api
+    app.kubernetes.io/part-of: nimbus
+spec:
+  metrics:
+    # failureCondition (not successCondition) on purpose: the recording rules
+    # yield NaN on an idle service, and a NaN measurement satisfies neither a
+    # threshold comparison. With failureCondition-only, a non-failing sample
+    # (including NaN) is scored Successful, so an idle canary auto-passes instead
+    # of burning the failureLimit. failureLimit: 1 rides out a single scrape blip
+    # but aborts on a sustained breach.
+    - name: error-ratio
+      interval: 1m
+      count: 5
+      failureLimit: 1
+      failureCondition: result[0] > 0.01
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.monitoring:9090
+          query: |
+            slo:sli_error:ratio_rate5m{namespace="nimbus"}
+
+    - name: p99-latency
+      interval: 1m
+      count: 5
+      failureLimit: 1
+      failureCondition: result[0] > 1
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.monitoring:9090
+          query: |
+            job:http_request_duration_seconds:p99{namespace="nimbus"}
