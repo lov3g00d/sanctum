@@ -26,6 +26,12 @@ variable "environment" {
 # Addon toggles. Everything defaults on so a plain `terraform apply` yields the full
 # platform layer; a Terragrunt env can trim it per environment.
 
+variable "enable_cilium" {
+  description = "Install Cilium as the primary CNI and kube-proxy replacement."
+  type        = bool
+  default     = true
+}
+
 variable "enable_alb_controller" {
   description = "Install the AWS Load Balancer Controller."
   type        = bool
@@ -87,6 +93,12 @@ variable "enable_kyverno" {
 }
 
 # Chart versions. Pinned so an apply is reproducible; bump deliberately per chart.
+
+variable "cilium_chart_version" {
+  description = "Cilium chart version."
+  type        = string
+  default     = "1.20.0"
+}
 
 variable "alb_controller_chart_version" {
   description = "aws-load-balancer-controller chart version."

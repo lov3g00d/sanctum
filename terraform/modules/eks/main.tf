@@ -31,11 +31,17 @@ module "eks" {
 
   enable_irsa = true
 
-  # Karpenter (and other platform addons) authenticate via EKS Pod Identity, which
-  # requires this agent running on the cluster. Without it the pod-identity
-  # associations created in modules/platform never resolve credentials.
+  # Cilium is the dataplane and replaces kube-proxy (modules/platform/cilium.tf), so
+  # this cluster is deliberately kube-proxy-free. The v21 module hardcodes
+  # bootstrap_self_managed_addons = false, meaning EKS installs no networking addon
+  # unless it is declared here. kube-proxy is therefore absent simply because it is
+  # not listed. vpc-cni stays because ENI-mode Cilium still relies on it for ENI/IP
+  # allocation (its dataplane is patched off at day-0, see docs/networking-cilium.md);
+  # coredns and the pod-identity agent are the remaining cluster essentials.
   addons = {
     eks-pod-identity-agent = {}
+    coredns                = {}
+    vpc-cni                = {}
   }
 
   authentication_mode                      = "API"
@@ -61,6 +67,18 @@ module "eks" {
       max_size       = var.node_max_size
       desired_size   = var.node_desired_size
       subnet_ids     = var.private_subnet_ids
+
+      # Cilium taints each node with node.cilium.io/agent-not-ready until its agent
+      # is Ready. Seeding the same taint at the node group keeps every workload off a
+      # node until Cilium owns its dataplane, which avoids pods coming up with broken
+      # networking during bootstrap on a kube-proxy-free cluster. Cilium removes it.
+      taints = {
+        cilium_not_ready = {
+          key    = "node.cilium.io/agent-not-ready"
+          value  = "true"
+          effect = "NO_EXECUTE"
+        }
+      }
     }
   }
 

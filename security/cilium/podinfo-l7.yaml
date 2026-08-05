@@ -1,0 +1,60 @@
+---
+# L7 network policy for podinfo, enforced by Cilium's eBPF dataplane. Because the
+# endpointSelector below is matched with both an ingress and an egress section,
+# Cilium applies default-deny in both directions and only the listed flows are
+# allowed. This is the Cilium-native counterpart to the Kubernetes NetworkPolicies
+# in kubernetes/security/networkpolicy.yaml: Cilium enforces those too, this one
+# adds HTTP method/path filtering (GET on the health, readiness, metrics and app
+# paths) that plain NetworkPolicy cannot express.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: podinfo-l7
+  namespace: nimbus
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: podinfo
+      app.kubernetes.io/component: api
+  ingress:
+    # ALB IP-target mode connects from the load-balancer ENIs in the public
+    # subnets, so the peer is a CIDR outside cluster identity, not a namespace.
+    # Partner traffic and the ALB health check hit the app and probe paths.
+    - fromCIDR:
+        - 10.0.0.0/20
+      toPorts:
+        - ports:
+            - port: "9898"
+              protocol: TCP
+          rules:
+            http:
+              - method: GET
+                path: /
+              - method: GET
+                path: /healthz
+              - method: GET
+                path: /readyz
+    # Prometheus in the monitoring namespace scrapes /metrics only.
+    - fromEndpoints:
+        - matchLabels:
+            kubernetes.io/metadata.name: monitoring
+      toPorts:
+        - ports:
+            - port: "9898"
+              protocol: TCP
+          rules:
+            http:
+              - method: GET
+                path: /metrics
+  egress:
+    # default-deny drops DNS too; without this every name lookup fails.
+    - toEndpoints:
+        - matchLabels:
+            k8s-app: kube-dns
+            io.kubernetes.pod.namespace: kube-system
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP

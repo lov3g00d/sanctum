@@ -11,6 +11,7 @@ output "monitoring_namespace" {
 output "installed_charts" {
   description = "Map of installed addon chart names to their pinned versions."
   value = merge(
+    var.enable_cilium ? { "cilium" = var.cilium_chart_version } : {},
     var.enable_alb_controller ? { "aws-load-balancer-controller" = var.alb_controller_chart_version } : {},
     var.enable_cert_manager ? { "cert-manager" = var.cert_manager_chart_version } : {},
     var.enable_external_secrets ? { "external-secrets" = var.external_secrets_chart_version } : {},
