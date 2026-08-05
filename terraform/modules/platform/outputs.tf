@@ -22,5 +22,9 @@ output "installed_charts" {
     var.enable_argocd ? { "argo-cd" = var.argocd_chart_version } : {},
     var.enable_falco ? { "falco" = var.falco_chart_version } : {},
     var.enable_kyverno ? { "kyverno" = var.kyverno_chart_version } : {},
+    var.enable_loki ? { "loki" = var.loki_chart_version } : {},
+    var.enable_vector ? { "vector" = var.vector_chart_version } : {},
+    var.enable_tempo ? { "tempo" = var.tempo_chart_version } : {},
+    var.enable_otel_collector ? { "opentelemetry-collector" = var.otel_collector_chart_version } : {},
   )
 }

@@ -41,22 +41,38 @@ groups act on them.
 The two are complementary, not competing: RED tells you the service is hurting,
 USE tells you which resource to blame.
 
-## Metrics, logs, traces
+## Metrics, logs, traces, flows
 
-Three signals, three backends, one correlation story:
+Four signals, one correlation story, all surfaced in Grafana:
 
 - **Metrics (Prometheus).** Cheap, numeric, aggregatable. The basis for
   dashboards and alerts. Answers "is it broken and how badly", not "why".
-- **Logs (Loki).** High-cardinality detail per event. Answers "what exactly
-  happened to this request". Queried with LogQL, provisioned as a Grafana
-  datasource alongside Prometheus.
-- **Traces (Tempo, via OpenTelemetry).** The path of one request across
-  services. Answers "where did the time go" and "which hop failed". The app
-  emits OTel spans; exemplars on the latency histogram and a `trace_id` in log
-  lines let you jump metric -> log -> trace without leaving Grafana.
+  Delivered by the kube-prometheus-stack.
+- **Logs (Vector -> Loki).** High-cardinality detail per event. Answers "what
+  exactly happened to this request". Vector runs as a node agent (DaemonSet),
+  tails every container's stdout, labels each line with pod/namespace/container,
+  and ships it to Loki. Queried with LogQL through the Loki datasource.
+- **Traces (podinfo -> OTel Collector -> Tempo).** The path of one request
+  across services. Answers "where did the time go" and "which hop failed".
+  podinfo emits OTLP spans to the OpenTelemetry Collector, which batches and
+  forwards them to Tempo. Sending through the collector rather than straight to
+  Tempo keeps sampling, enrichment and backend choice out of the app.
+- **Flows (Hubble).** Network-level visibility from the Cilium dataplane: which
+  pod talked to which, on what port, allowed or dropped. Answers questions the
+  other three cannot, such as "is a NetworkPolicy silently dropping this call".
+  Hubble metrics land in Prometheus and the flow graph in the Hubble UI.
 
-Reach for metrics first (is there a problem, how big), logs to characterise it,
-traces to localise it.
+The three application signals are stitched together in Grafana. The Tempo
+datasource carries `tracesToLogsV2` (to Loki) and `tracesToMetrics` (to
+Prometheus) links, so a slow span pivots straight to that pod's logs and its RED
+metrics without a manual query. Reach for metrics first (is there a problem, how
+big), logs to characterise it, traces to localise it, flows when the problem is
+in the network path rather than the app.
+
+Turning on tracing in podinfo (`PODINFO_OTEL_SERVICE_NAME`) also enables its OTLP
+log exporter, but that path is incidental. The authoritative log path is stdout
+-> Vector -> Loki, which captures every container uniformly rather than only the
+ones instrumented for OTel.
 
 ## SLOs and error budgets
 
@@ -114,7 +130,7 @@ prometheus/prometheus.yml            scrape jobs, external labels, rule + AM wir
 prometheus/rules/recording.rules.yml RED + SLI series (level:metric:operation)
 prometheus/rules/alerts.yml          burn-rate, symptom, Kube/Node/RDS, platform
 alertmanager/alertmanager.yml        routing (page->PagerDuty, ticket->Slack), inhibitions
-grafana/provisioning/datasources.yml Prometheus + Loki
+grafana/provisioning/datasources.yml Prometheus + Loki + Tempo (with trace correlation)
 grafana/provisioning/dashboards.yml  file-provider for the dashboards below
 grafana/dashboards/podinfo-red.json     RED, per path
 grafana/dashboards/slo.json             SLI, error budget, burn rate

@@ -50,6 +50,14 @@ spec:
             - name: http
               containerPort: 9898
               protocol: TCP
+          env:
+            # Setting otel-service-name is what switches podinfo's tracing on; the
+            # OTLP gRPC exporter then reads OTEL_EXPORTER_OTLP_ENDPOINT. The http://
+            # scheme selects an insecure (non-TLS) connection to the collector.
+            - name: PODINFO_OTEL_SERVICE_NAME
+              value: podinfo
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://opentelemetry-collector.monitoring:4317
           envFrom:
             - configMapRef:
                 name: podinfo-config

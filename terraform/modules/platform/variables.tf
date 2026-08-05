@@ -92,6 +92,30 @@ variable "enable_kyverno" {
   default     = true
 }
 
+variable "enable_loki" {
+  description = "Install Loki as the logs backend."
+  type        = bool
+  default     = true
+}
+
+variable "enable_vector" {
+  description = "Install Vector as the node log collector shipping to Loki."
+  type        = bool
+  default     = true
+}
+
+variable "enable_tempo" {
+  description = "Install Tempo as the traces backend."
+  type        = bool
+  default     = true
+}
+
+variable "enable_otel_collector" {
+  description = "Install the OpenTelemetry Collector as the trace ingestion point."
+  type        = bool
+  default     = true
+}
+
 # Chart versions. Pinned so an apply is reproducible; bump deliberately per chart.
 
 variable "cilium_chart_version" {
@@ -158,4 +182,28 @@ variable "kyverno_chart_version" {
   description = "kyverno chart version."
   type        = string
   default     = "3.8.2"
+}
+
+variable "loki_chart_version" {
+  description = "loki chart version."
+  type        = string
+  default     = "7.2.0"
+}
+
+variable "vector_chart_version" {
+  description = "vector chart version."
+  type        = string
+  default     = "0.57.0"
+}
+
+variable "tempo_chart_version" {
+  description = "tempo chart version."
+  type        = string
+  default     = "1.24.4"
+}
+
+variable "otel_collector_chart_version" {
+  description = "opentelemetry-collector chart version."
+  type        = string
+  default     = "0.167.0"
 }

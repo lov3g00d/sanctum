@@ -18,4 +18,32 @@ datasources:
     type: loki
     uid: loki
     access: proxy
-    url: http://loki-gateway.monitoring.svc.cluster.local:3100
+    url: http://loki.monitoring:3100
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo.monitoring:3200
+    jsonData:
+      # Pivot a span to the pod's logs in Loki and to its RED metrics in
+      # Prometheus, so a trace is the hub the other two signals hang off.
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -1h
+        spanEndTimeShift: 1h
+        filterByTraceID: false
+        filterBySpanID: false
+        tags:
+          - key: k8s.namespace.name
+            value: namespace
+          - key: k8s.pod.name
+            value: pod
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: -1h
+        spanEndTimeShift: 1h
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
