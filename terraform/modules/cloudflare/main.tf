@@ -33,6 +33,9 @@ resource "cloudflare_authenticated_origin_pulls" "this" {
 # execute the Cloudflare Managed Ruleset (managed WAF). The id is the well-known,
 # account-independent identifier of that ruleset.
 resource "cloudflare_ruleset" "managed_waf" {
+  # Managed WAF rulesets are a paid (Pro+) entitlement; disable on a Free zone.
+  count = var.enable_waf ? 1 : 0
+
   zone_id = var.zone_id
   name    = "nimbus-managed-waf"
   kind    = "zone"
@@ -50,6 +53,10 @@ resource "cloudflare_ruleset" "managed_waf" {
 }
 
 resource "cloudflare_ruleset" "rate_limit" {
+  # Rate-limiting rules with these characteristics are a paid entitlement; the Free
+  # plan allows only a single basic rule. Gated with the managed WAF for simplicity.
+  count = var.enable_waf ? 1 : 0
+
   zone_id = var.zone_id
   name    = "nimbus-rate-limit"
   kind    = "zone"

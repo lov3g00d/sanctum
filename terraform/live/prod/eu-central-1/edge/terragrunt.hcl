@@ -23,7 +23,7 @@ locals {
 
 inputs = {
   zone_id         = "0123456789abcdef0123456789abcdef"
-  origin_hostname = "-podinfo.eu-central-1.elb.amazonaws.com"
+  origin_hostname = "${include.root.locals.environment}-podinfo.eu-central-1.elb.amazonaws.com"
 
   rate_limit_requests_per_period = local.is_prod ? 300 : 600
 }

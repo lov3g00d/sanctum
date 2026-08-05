@@ -4,11 +4,11 @@ output "record_hostname" {
 }
 
 output "managed_waf_ruleset_id" {
-  description = "ID of the managed WAF ruleset deployment."
-  value       = cloudflare_ruleset.managed_waf.id
+  description = "ID of the managed WAF ruleset deployment (null when enable_waf is false)."
+  value       = one(cloudflare_ruleset.managed_waf[*].id)
 }
 
 output "rate_limit_ruleset_id" {
-  description = "ID of the rate-limit ruleset."
-  value       = cloudflare_ruleset.rate_limit.id
+  description = "ID of the rate-limit ruleset (null when enable_waf is false)."
+  value       = one(cloudflare_ruleset.rate_limit[*].id)
 }

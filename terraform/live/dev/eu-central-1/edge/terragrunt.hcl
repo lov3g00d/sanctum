@@ -17,13 +17,14 @@ generate "cloudflare_provider" {
   EOF
 }
 
-locals {
-  is_prod = include.root.locals.environment == "prod"
-}
-
 inputs = {
-  zone_id         = "0123456789abcdef0123456789abcdef"
-  origin_hostname = "-podinfo.eu-central-1.elb.amazonaws.com"
+  zone_id     = "0123456789abcdef0123456789abcdef"
+  record_name = "podinfo.example.com"
 
-  rate_limit_requests_per_period = local.is_prod ? 300 : 600
+  # Managed WAF and advanced rate limiting are Pro+ features; leave false on a Free
+  # zone, set true on a paid plan.
+  enable_waf = false
+
+  # ALB origin, populated once the ingress exists.
+  origin_hostname = "${include.root.locals.environment}-podinfo.eu-central-1.elb.amazonaws.com"
 }
