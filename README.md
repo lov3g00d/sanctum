@@ -19,8 +19,9 @@ secrets. The value is in the shape of the code and the reasoning in `docs/`.
 |------|---------------|
 | `terraform/modules/` | Reusable modules: `vpc`, `eks`, `rds`, `cloudflare`, `github-oidc`, and `platform` (the Helm addon layer) |
 | `terraform/live/` | Terragrunt env layer: `dev`/`prod` units wiring the modules with S3 + DynamoDB remote state and `dependency`-passed outputs |
-| `kubernetes/` | Kustomize base + `dev`/`prod` overlays, and hardening: Pod Security, default-deny NetworkPolicy, RBAC, Kyverno, HPA/PDB |
-| `gitops/` | ArgoCD `AppProject` + `ApplicationSet` and an Argo Rollout canary gated on the SLO |
+| `charts/podinfo/` | Helm chart for the podinfo app: Rollout/Deployment, service, ingress, HPA/PDB, network policies, ServiceMonitor, PrometheusRule, SLO dashboards |
+| `kubernetes/` | Cluster + namespace hardening: Pod Security, default-deny NetworkPolicy, RBAC, Kyverno, quotas |
+| `gitops/` | ArgoCD `AppProject` + `ApplicationSet` delivering the podinfo chart per environment |
 | `security/` | Admission (Kyverno `verifyImages`/cosign), runtime (Falco rules), and posture (kube-bench, Prowler, Trivy) |
 | `monitoring/` | Prometheus rules, Grafana dashboards, Alertmanager, multi-burn-rate SLOs |
 | `docker/` | Multistage Dockerfile that builds the podinfo workload image from pinned source, and a hardened Nginx reverse proxy |
@@ -42,10 +43,12 @@ root module.
 - **Day 1 (platform bootstrap):** `terraform/modules/platform` installs the cluster
   infrastructure via `helm_release` with per-chart IRSA: AWS Load Balancer Controller,
   cert-manager, external-secrets, external-dns, metrics-server, Karpenter,
-  kube-prometheus-stack, ArgoCD, Falco, and Kyverno. Each addon is toggle-gated.
-- **Day 2 (application delivery):** `gitops/` holds the ArgoCD `ApplicationSet` (a git
-  directory generator over the overlays, the modern replacement for hand-written
-  app-of-apps) and an Argo Rollout whose canary aborts on the Prometheus SLO error budget.
+  kube-prometheus-stack, ArgoCD, Argo Rollouts, Falco, and Kyverno. Each addon is
+  toggle-gated.
+- **Day 2 (application delivery):** `gitops/` holds the ArgoCD `ApplicationSet` (a list
+  generator over environments, the modern replacement for hand-written app-of-apps)
+  syncing the `charts/podinfo` Helm chart, whose SLO-gated Argo Rollout canary aborts
+  on the Prometheus error budget.
 
 ## Security across the lifecycle
 

@@ -5,73 +5,9 @@
 # Kube*/Node* expressions are the kubernetes-mixin canonical forms, instantiated
 # with clusterLabel=cluster and job="kube-state-metrics".
 groups:
-  - name: podinfo-slo.alerts
-    rules:
-      # Google SRE multi-window, multi-burn-rate. Budget for a 99.9% SLO is
-      # 0.001. 14.4x burn over the 1h window exhausts ~2% of a 30-day budget in
-      # an hour; the 5m window must agree so a resolved blip stops paging fast.
-      - alert: PodinfoErrorBudgetBurnFast
-        expr: |
-          slo:sli_error:ratio_rate1h{namespace="nimbus"} > (14.4 * 0.001)
-          and
-          slo:sli_error:ratio_rate5m{namespace="nimbus"} > (14.4 * 0.001)
-        for: 2m
-        labels:
-          severity: page
-          service: podinfo
-        annotations:
-          summary: podinfo error budget burning fast (>14.4x)
-          description: >
-            5xx ratio over 1h and 5m both exceed 14.4x the 99.9% SLO budget.
-            At this rate 2% of the 30-day error budget is gone within an hour.
-          runbook_url: https://runbooks.nimbus.example.com/podinfo/error-budget-burn
-
-      # 6x burn over 6h spends ~5% of the budget; slow enough to be a ticket, the
-      # 30m window keeps it from lingering after recovery.
-      - alert: PodinfoErrorBudgetBurnSlow
-        expr: |
-          slo:sli_error:ratio_rate6h{namespace="nimbus"} > (6 * 0.001)
-          and
-          slo:sli_error:ratio_rate30m{namespace="nimbus"} > (6 * 0.001)
-        for: 15m
-        labels:
-          severity: ticket
-          service: podinfo
-        annotations:
-          summary: podinfo error budget burning (>6x)
-          description: >
-            5xx ratio over 6h and 30m both exceed 6x the 99.9% SLO budget.
-            Sustained; budget will be exhausted well before the window closes.
-          runbook_url: https://runbooks.nimbus.example.com/podinfo/error-budget-burn
-
-  - name: podinfo-symptoms.alerts
-    rules:
-      # Blunt backstop for a hard outage the burn-rate math would also catch, kept
-      # because a single obvious threshold is easy to reason about at 3am.
-      - alert: HighErrorRate
-        expr: |
-          slo:sli_error:ratio_rate5m{namespace="nimbus"} > 0.05
-        for: 10m
-        labels:
-          severity: page
-          service: podinfo
-        annotations:
-          summary: podinfo 5xx ratio above 5%
-          description: 'More than 5% of requests are failing (5xx) over the last 5m.'
-          runbook_url: https://runbooks.nimbus.example.com/podinfo/high-error-rate
-
-      - alert: HighLatencyP99
-        expr: |
-          job:http_request_duration_seconds:p99{namespace="nimbus"} > 1
-        for: 10m
-        labels:
-          severity: ticket
-          service: podinfo
-        annotations:
-          summary: podinfo p99 latency above 1s
-          description: '99th percentile request latency has exceeded 1s for 10m.'
-          runbook_url: https://runbooks.nimbus.example.com/podinfo/high-latency
-
+  # podinfo's own SLO burn-rate and symptom alerts moved into the app's Helm
+  # chart (charts/podinfo, PrometheusRule) alongside its recording rules. What
+  # stays here is global: Kubernetes, node, RDS and platform alerts.
   - name: kubernetes-workloads.alerts
     rules:
       # kube_pod_info joined in so the alert carries a node label; without it the

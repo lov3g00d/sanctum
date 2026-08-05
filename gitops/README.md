@@ -1,10 +1,11 @@
 # GitOps: application delivery for podinfo
 
-ArgoCD reconciles the Kustomize manifests under `kubernetes/` into the cluster.
+ArgoCD reconciles the podinfo Helm chart under `charts/podinfo` into the cluster.
 This directory holds the day-2 delivery CRs it acts on: the project that scopes
-what may be synced, the ApplicationSet that turns each overlay into an
-Application, and an optional Argo Rollouts example that gates promotion on the
-service's SLO.
+what may be synced, and the ApplicationSet that turns each environment into an
+Application. The SLO-gated Rollout and its AnalysisTemplate now ship inside the
+chart itself, so progressive delivery travels with the app rather than sitting in
+a separate example here.
 
 ## Day 1 vs day 2
 
@@ -17,7 +18,8 @@ cannot reach into the platform.
   Nothing in this directory installs ArgoCD.
 - **Day 2, this layer.** Once ArgoCD is running it needs to be told what to
   deliver. These are the application-delivery custom resources it reconciles:
-  `AppProject`, `ApplicationSet`, and (opt-in) `Rollout` + `AnalysisTemplate`.
+  `AppProject` and `ApplicationSet`. The `Rollout` and `AnalysisTemplate` are
+  rendered by the chart, not defined here.
 
 Bootstrapping is a single apply of `gitops/` (project + ApplicationSet); from
 there ArgoCD manages the rest from git.
@@ -32,46 +34,47 @@ this org runs ~75 hand-written Applications and zero ApplicationSets; that is th
 maintenance cost this layer is built to avoid.)
 
 An [ApplicationSet](applicationset.yaml) replaces the folder of copies with a
-generator plus one template. The git **directory generator** globs
-`kubernetes/overlays/*` and emits one element per matching directory;
-`{{path.basename}}` is the leaf name (`dev`, `prod`). Each element renders the
-template into an Application named `podinfo-<env>` whose `source.path`
-is that overlay. Add `kubernetes/overlays/staging/` and a staging Application
-appears on the next reconcile with no edit here. One template is the single
+generator plus one template. The **list generator** carries one element per
+environment (`{{env}}` = `dev`, `prod`). Each element renders the template into
+an Application named `podinfo-<env>` that syncs `charts/podinfo` with Helm value
+files `values.yaml` + `values-<env>.yaml`, so the base chart and its env override
+are the whole per-environment surface. Add an element and a new Application
+appears on the next reconcile with no other edit here. One template is the single
 place a delivery-policy change (sync options, project, destination) lands.
 
 Sync policy is `automated` with `prune` and `selfHeal`, plus
-`CreateNamespace=true`, so a deleted resource is restored and a removed overlay
-is pruned without a human in the loop.
+`CreateNamespace=true`, so a deleted resource is restored and a removed
+environment is pruned without a human in the loop.
 
 ### One cluster, one destination: read this before applying
 
 The generated `podinfo-dev` and `podinfo-prod` both target
-`https://kubernetes.default.svc` and namespace `nimbus`, because both overlays
-set that namespace and the `nimbus` AppProject exposes a single in-cluster
+`https://kubernetes.default.svc` and namespace `nimbus`, because the template
+sets that destination and the `nimbus` AppProject exposes a single in-cluster
 destination. Applied to **one** cluster they would fight over the same resource
 names. That is intentional for a single-cluster practice repo that shows
-per-overlay Application generation. Real multi-env delivery keeps the envs apart
-by pairing the git generator with a **cluster generator** in a matrix, so each
-overlay lands on its own cluster (or its own namespace). That composition, one
-generator feeding another, is the second reason ApplicationSets win over
-app-of-apps: the fan-out is declarative, not copy-paste.
+per-environment Application generation. Real multi-env delivery keeps the envs
+apart by pairing the list generator with a **cluster generator** in a matrix, so
+each environment lands on its own cluster (or its own namespace). That
+composition, one generator feeding another, is the second reason ApplicationSets
+win over app-of-apps: the fan-out is declarative, not copy-paste.
 
 ## SLO-gated canary (Argo Rollouts)
 
-`rollouts/` is an opt-in progressive-delivery example. A
-[Rollout](rollouts/podinfo-rollout.yaml) **replaces** the Deployment (you
-drop `deployment.yaml` from the overlay and reconcile the Rollout instead); the
-podSpec mirrors the hardened Deployment so the non-root, read-only-rootfs,
-drop-ALL-caps, probe-on-`/healthz`-and-`/readyz` posture is unchanged.
+Progressive delivery is built into the chart. A Rollout **replaces** the
+Deployment: the chart renders one or the other from a single shared pod template
+(gated on `rollout.enabled`, default `true`), so the non-root, read-only-rootfs,
+drop-ALL-caps, probe-on-`/healthz`-and-`/readyz` posture is identical either way.
+Set `rollout.enabled=false` (as the CI direct-apply path does) to fall back to a
+plain Deployment when the argo-rollouts controller is not present.
 
 The canary advances in steps: `setWeight: 20` -> `pause 5m` -> **analysis** ->
 `setWeight: 50` -> **analysis** -> `setWeight: 100`. The pause lets canary
 traffic accumulate so the 5-minute-rate recording rules have a real window to
 measure before the first gate.
 
-Each analysis runs the [AnalysisTemplate](rollouts/analysistemplate-slo.yaml),
-which queries Prometheus at
+Each analysis runs the chart's AnalysisTemplate (`podinfo-slo`), which queries
+Prometheus at
 `http://kube-prometheus-stack-prometheus.monitoring:9090` for two precomputed
 recording rules, scoped to `{namespace="nimbus"}` so each returns a single
 series:
@@ -112,8 +115,5 @@ multi-stage promotion; mentioned here as the next step, not wired up.
 | File | What it is |
 |------|------------|
 | `appproject.yaml` | `AppProject nimbus`: source-repo allowlist, `nimbus` + `monitoring` destinations, least-privilege resource whitelists |
-| `applicationset.yaml` | Git directory generator over `kubernetes/overlays/*`, one Application per env |
+| `applicationset.yaml` | List generator over `[dev, prod]`, one Application per env syncing `charts/podinfo` with its value files |
 | `kustomization.yaml` | Collects the project + ApplicationSet (the bootstrap apply) |
-| `rollouts/podinfo-rollout.yaml` | Opt-in Rollout that replaces the Deployment, canary strategy |
-| `rollouts/analysistemplate-slo.yaml` | Prometheus AnalysisTemplate: error-ratio and p99 SLO gates |
-| `rollouts/kustomization.yaml` | Builds the Rollout example on its own |

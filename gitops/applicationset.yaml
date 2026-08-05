@@ -7,33 +7,36 @@ metadata:
   labels:
     app.kubernetes.io/part-of: nimbus
 spec:
-  # Prune Applications whose overlay directory disappears from git. Without this,
-  # deleting an overlay leaves an orphaned Application still syncing.
+  # Prune Applications whose generator element disappears. Without this, removing
+  # an environment leaves an orphaned Application still syncing.
   syncPolicy:
     preserveResourcesOnDeletion: false
 
   generators:
-    # Git directory generator: one element per directory matching the glob, so a
-    # new overlay under kubernetes/overlays/ becomes an Application with no edit
-    # here. path.basename is the leaf dir name (dev, prod) used as the env.
-    - git:
-        repoURL: https://github.com/nimbus-org/nimbus.git
-        revision: main
-        directories:
-          - path: kubernetes/overlays/*
+    # List generator: one element per environment. Each renders the podinfo Helm
+    # chart with its base values plus the env override file. Add an environment
+    # by adding an element here; there is no per-env manifest directory to author.
+    - list:
+        elements:
+          - env: dev
+          - env: prod
 
   template:
     metadata:
-      name: 'podinfo-{{path.basename}}'
+      name: 'podinfo-{{env}}'
       labels:
         app.kubernetes.io/part-of: nimbus
-        environment: '{{path.basename}}'
+        environment: '{{env}}'
     spec:
       project: nimbus
       source:
         repoURL: https://github.com/nimbus-org/nimbus.git
         targetRevision: main
-        path: '{{path}}'
+        path: charts/podinfo
+        helm:
+          valueFiles:
+            - values.yaml
+            - 'values-{{env}}.yaml'
       destination:
         server: https://kubernetes.default.svc
         namespace: nimbus

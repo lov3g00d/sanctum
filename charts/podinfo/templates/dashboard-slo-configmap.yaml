@@ -1,0 +1,16 @@
+{{- if .Values.dashboards.enabled }}
+# Grafana sidecar (kube-prometheus-stack) loads ConfigMaps labelled
+# grafana_dashboard="1" from the monitoring namespace, so the dashboard is
+# delivered alongside the app rather than baked into the stack chart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "podinfo.fullname" . }}-dashboard-slo
+  namespace: {{ .Values.dashboards.namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  slo.json: |-
+{{ .Files.Get "dashboards/slo.json" | indent 4 }}
+{{- end }}

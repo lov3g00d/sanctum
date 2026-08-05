@@ -26,10 +26,11 @@ what to look at before they know anything about the service:
 The golden signals split cleanly by what you are looking at.
 
 **RED** (Rate, Errors, Duration) fits the request-driven core, `podinfo`.
-It is exactly latency + traffic + errors, framed per endpoint. The dashboard
-`grafana/dashboards/podinfo-red.json` is nothing but RED, sliced by path.
-Because podinfo's request counter carries no path label, the per-path RED series
-come from the `http_request_duration_seconds` histogram `_count`.
+It is exactly latency + traffic + errors, framed per endpoint. podinfo's RED
+dashboard ships with the app in [`charts/podinfo`](../charts/podinfo) (delivered
+as a Grafana-sidecar ConfigMap) and is nothing but RED, sliced by path. Because
+podinfo's request counter carries no path label, the per-path RED series come
+from the `http_request_duration_seconds` histogram `_count`.
 
 **USE** (Utilization, Saturation, Errors) fits the resources underneath: nodes,
 RDS, Redis. For a node you ask how busy it is (utilization), whether work is
@@ -120,21 +121,27 @@ Two windows per alert on purpose: the **long** window gives significance (a real
 sustained burn, not a blip), the **short** window gives fast reset (the alert
 clears quickly once the burn stops). Two burn rates give sensitivity without
 noise: a fast catastrophic burn pages immediately, a slow grind opens a ticket
-before the budget is gone. Thresholds live in
-`prometheus/rules/alerts.yml`, the SLI series in `recording.rules.yml`.
+before the budget is gone. podinfo's burn-rate and symptom thresholds and its
+SLI recording rules ship with the app (`charts/podinfo`, as a `PrometheusRule`);
+what remains in `prometheus/rules/alerts.yml` is the global Kube/Node/RDS/platform
+set.
 
 ## Layout
 
 ```
 prometheus/prometheus.yml            scrape jobs, external labels, rule + AM wiring
-prometheus/rules/recording.rules.yml RED + SLI series (level:metric:operation)
-prometheus/rules/alerts.yml          burn-rate, symptom, Kube/Node/RDS, platform
+prometheus/rules/alerts.yml          global Kube/Node/RDS/platform alerts
 alertmanager/alertmanager.yml        routing (page->PagerDuty, ticket->Slack), inhibitions
 grafana/provisioning/datasources.yml Prometheus + Loki + Tempo (with trace correlation)
-grafana/provisioning/dashboards.yml  file-provider for the dashboards below
-grafana/dashboards/podinfo-red.json     RED, per path
-grafana/dashboards/slo.json             SLI, error budget, burn rate
+grafana/provisioning/dashboards.yml  file-provider for sidecar-loaded dashboards
 ```
+
+podinfo's own observability wiring, its RED + SLO dashboards, its RED/SLI
+recording rules, its burn-rate and symptom alerts, and the ServiceMonitor that
+replaces the static `podinfo` scrape job, ships with the app under
+[`charts/podinfo`](../charts/podinfo). The Prometheus Operator (kube-prometheus-stack)
+selects those `ServiceMonitor`/`PrometheusRule` objects, and the Grafana sidecar
+picks up the dashboard ConfigMaps from the `monitoring` namespace.
 
 ## Assumptions
 

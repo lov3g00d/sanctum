@@ -1,16 +1,14 @@
----
+{{- if .Values.rollout.enabled }}
 # SLO gate for the podinfo canary. Both metrics query the precomputed recording
-# rules (see monitoring/prometheus/rules/recording.rules.yml), which aggregate
-# `by (namespace)`, so `{namespace="nimbus"}` returns a single series and
-# result[0] is well defined.
+# rules from the PrometheusRule, which aggregate `by (namespace)`, so
+# `{namespace="nimbus"}` returns a single series and result[0] is well defined.
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
-  name: podinfo-slo
-  namespace: nimbus
+  name: {{ include "podinfo.fullname" . }}-slo
+  namespace: {{ .Release.Namespace }}
   labels:
-    app.kubernetes.io/name: podinfo
-    app.kubernetes.io/part-of: nimbus
+    {{- include "podinfo.labels" . | nindent 4 }}
 spec:
   metrics:
     # failureCondition (not successCondition) on purpose: the recording rules
@@ -40,3 +38,4 @@ spec:
           address: http://kube-prometheus-stack-prometheus.monitoring:9090
           query: |
             job:http_request_duration_seconds:p99{namespace="nimbus"}
+{{- end }}

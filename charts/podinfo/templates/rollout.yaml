@@ -1,0 +1,54 @@
+{{- if .Values.rollout.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "podinfo.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "podinfo.selectorLabels" . | nindent 6 }}
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        # Bake before the first analysis so the 5m-rate recording rules have
+        # canary traffic to measure rather than an empty window.
+        - pause:
+            duration: 5m
+        - analysis:
+            templates:
+              - templateName: {{ include "podinfo.fullname" . }}-slo
+        - setWeight: 50
+        - analysis:
+            templates:
+              - templateName: {{ include "podinfo.fullname" . }}-slo
+        - setWeight: 100
+  template:
+    {{- include "podinfo.podTemplate" . | nindent 4 }}
+{{- else }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "podinfo.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "podinfo.selectorLabels" . | nindent 6 }}
+  template:
+    {{- include "podinfo.podTemplate" . | nindent 4 }}
+{{- end }}

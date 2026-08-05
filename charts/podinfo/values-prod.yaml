@@ -1,0 +1,24 @@
+# prod: more replicas, larger footprint, info logging, hard topology spread.
+
+replicaCount: 4
+
+image:
+  tag: 1.8.0
+
+config:
+  logLevel: info
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+topologySpread:
+  whenUnsatisfiable: DoNotSchedule
+
+autoscaling:
+  minReplicas: 4
+  maxReplicas: 20

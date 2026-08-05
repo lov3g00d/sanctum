@@ -1,8 +1,0 @@
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: podinfo-config
-  namespace: nimbus
-data:
-  LOG_LEVEL: debug

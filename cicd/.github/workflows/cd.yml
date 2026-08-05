@@ -85,10 +85,15 @@ jobs:
 
       - name: set image tag and apply
         run: |
-          cd kubernetes/overlays/dev
-          kustomize edit set image \
-            nimbus/podinfo="${ECR_REGISTRY}/nimbus/podinfo:${GITHUB_SHA}"
-          kustomize build . | kubectl apply -f -
+          # Direct CI apply pins rollout.enabled=false so the chart renders a
+          # Deployment we can wait on with `kubectl rollout status`. The Argo
+          # Rollout path is driven by ArgoCD (gitops/), not this pipeline.
+          helm upgrade --install podinfo charts/podinfo \
+            --namespace nimbus --create-namespace \
+            -f charts/podinfo/values.yaml -f charts/podinfo/values-dev.yaml \
+            --set rollout.enabled=false \
+            --set image.repository="${ECR_REGISTRY}/nimbus/podinfo" \
+            --set image.tag="${GITHUB_SHA}"
           kubectl -n nimbus rollout status deployment/podinfo --timeout=300s
 
   dast-dev:
@@ -134,10 +139,15 @@ jobs:
 
       - name: set image tag and apply
         run: |
-          cd kubernetes/overlays/prod
-          kustomize edit set image \
-            nimbus/podinfo="${ECR_REGISTRY}/nimbus/podinfo:${GITHUB_SHA}"
-          kustomize build . | kubectl apply -f -
+          # Direct CI apply pins rollout.enabled=false so the chart renders a
+          # Deployment we can wait on with `kubectl rollout status`. The Argo
+          # Rollout path is driven by ArgoCD (gitops/), not this pipeline.
+          helm upgrade --install podinfo charts/podinfo \
+            --namespace nimbus --create-namespace \
+            -f charts/podinfo/values.yaml -f charts/podinfo/values-prod.yaml \
+            --set rollout.enabled=false \
+            --set image.repository="${ECR_REGISTRY}/nimbus/podinfo" \
+            --set image.tag="${GITHUB_SHA}"
           kubectl -n nimbus rollout status deployment/podinfo --timeout=300s
 
       # Rollback: `kubectl rollout status` above fails the job if a new

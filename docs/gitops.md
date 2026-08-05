@@ -11,9 +11,10 @@ Two ownership layers, kept apart on purpose:
   `argocd`). ArgoCD is treated as infrastructure, created and upgraded like the
   cluster itself.
 - **The GitOps layer tells ArgoCD what to deliver.** An `AppProject` scopes what
-  may be synced, and an `ApplicationSet` with a git directory generator turns
-  each Kustomize overlay under `kubernetes/overlays/*` into its own Application.
-  Adding an environment is adding a directory, not authoring another Application.
+  may be synced, and an `ApplicationSet` with a list generator turns each
+  environment into its own Application, syncing the `charts/podinfo` Helm chart
+  with its base plus per-env value files. Adding an environment is adding a list
+  element, not authoring another Application.
 
 This is the modern shape: `ApplicationSet` instead of a folder of hand-written
 `Application` objects (app-of-apps), and `Argo Rollouts` for a canary that is

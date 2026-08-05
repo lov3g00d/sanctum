@@ -29,6 +29,20 @@ resource "kubernetes_namespace" "argocd" {
   }
 }
 
+resource "kubernetes_namespace" "argo_rollouts" {
+  count = var.enable_argo_rollouts ? 1 : 0
+
+  metadata {
+    name = "argo-rollouts"
+    labels = {
+      "app.kubernetes.io/managed-by"       = "terraform"
+      "pod-security.kubernetes.io/enforce" = "restricted"
+      "pod-security.kubernetes.io/audit"   = "restricted"
+      "pod-security.kubernetes.io/warn"    = "restricted"
+    }
+  }
+}
+
 resource "kubernetes_namespace" "monitoring" {
   count = var.enable_kube_prometheus_stack ? 1 : 0
 

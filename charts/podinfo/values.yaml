@@ -1,0 +1,117 @@
+# Base defaults for podinfo. values-dev.yaml and values-prod.yaml carry the
+# per-environment split that used to live in the kustomize overlays.
+
+nameOverride: ""
+
+replicaCount: 3
+
+image:
+  repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/nimbus/podinfo
+  # tag defaults to Chart.appVersion (6.14.1) when left empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  name: ""
+  # IRSA role, wired per environment/account. Empty renders no annotation.
+  annotations: {}
+
+config:
+  logLevel: info
+  awsRegion: eu-central-1
+  metricsPath: /metrics
+
+otel:
+  endpoint: http://opentelemetry-collector.monitoring:4317
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+topologySpread:
+  whenUnsatisfiable: ScheduleAnyway
+
+service:
+  port: 80
+
+pdb:
+  minAvailable: 50%
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 4
+          periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+# Progressive delivery. When true the chart ships an Argo Rollout (canary,
+# SLO-gated); when false it falls back to a plain apps/v1 Deployment so the
+# chart is usable without the argo-rollouts controller.
+rollout:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: alb
+  host: podinfo.sandbox.zmkv.online
+  # ACM cert and WAFv2 ACL are placeholders; Terraform wires the real ARNs.
+  certificateArn: arn:aws:acm:eu-central-1:123456789012:certificate/REPLACE_ME
+  wafAclArn: ""
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+
+networkPolicy:
+  enabled: true
+  # ALB IP-target mode connects from the load-balancer ENIs in the public
+  # subnets, so the ingress peer is a CIDR, not a namespace.
+  ingressCidr: 10.0.0.0/20
+  # RDS PostgreSQL and ElastiCache Redis have ENIs in the data subnets.
+  dataStoresCidr: 10.0.32.0/20
+  postgresPort: 5432
+  redisPort: 6379
+  otlpPort: 4317
+
+ciliumNetworkPolicy:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+  # kube-prometheus-stack selects by this label (release name of the stack).
+  releaseLabel: kube-prometheus-stack
+  interval: 15s
+
+prometheusRule:
+  enabled: true
+  releaseLabel: kube-prometheus-stack
+
+dashboards:
+  enabled: true
+  namespace: monitoring

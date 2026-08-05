@@ -41,8 +41,8 @@ detection or accepted.
 
 | Threat | Vector | Control | Where |
 |--------|--------|---------|-------|
-| Denial of service | Volumetric / L7 flood | Cloudflare DDoS + rate limiting; HPA/Karpenter absorb legitimate spikes | `terraform/modules/cloudflare/`, `kubernetes/base/hpa.yaml` |
-| Tampering | Origin bypass to hit ALB directly | Authenticated origin pull (mTLS) edge to ALB; WAFv2 on the ALB | scenario B2, ALB ingress `kubernetes/base/ingress.yaml` |
+| Denial of service | Volumetric / L7 flood | Cloudflare DDoS + rate limiting; HPA/Karpenter absorb legitimate spikes | `terraform/modules/cloudflare/`, `charts/podinfo/templates/hpa.yaml` |
+| Tampering | Origin bypass to hit ALB directly | Authenticated origin pull (mTLS) edge to ALB; WAFv2 on the ALB | scenario B2, ALB ingress `charts/podinfo/templates/ingress.yaml` |
 | Info disclosure | TLS downgrade / sniffing | TLS at edge and re-terminated at ALB (ACM) | edge, ingress |
 
 ### B3 ingress to workload
@@ -60,7 +60,7 @@ detection or accepted.
 |--------|--------|---------|-------|
 | Lateral movement | Compromised pod scanning the namespace | Default-deny ingress/egress, explicit allows only to RDS/Redis CIDR | `kubernetes/security/networkpolicy.yaml` |
 | EoP | Pod reading other secrets via API | RBAC scoped by `resourceNames` to the workload's own ConfigMap/Secret | `kubernetes/security/rbac.yaml` |
-| Info disclosure | Credential theft from the pod | IRSA short-lived creds, not node role; secrets from Secrets Manager, never in Git | `kubernetes/base/serviceaccount.yaml`, `kubernetes/README.md` |
+| Info disclosure | Credential theft from the pod | IRSA short-lived creds, not node role; secrets from Secrets Manager, never in Git | `charts/podinfo/templates/serviceaccount.yaml`, `kubernetes/README.md` |
 | Spoofing | Stolen SA token used against the API server | Falco alerts on token read by a shell | `security/falco/custom-rules.yaml` |
 | Repudiation | Post-compromise persistence/tampering | Read-only rootfs; Falco alerts on writes to sensitive dirs and shell spawn | PSA restricted + `security/falco/custom-rules.yaml` |
 
@@ -103,7 +103,7 @@ block, and the matrix is honest about which is which.
 | Pod hardening policies | `kubernetes/security/kyverno-policies.yaml` | `:latest`, root, writable rootfs, no limits, extra caps | Enforced |
 | Network segmentation | `kubernetes/security/networkpolicy.yaml` | Lateral movement, unexpected egress | Enforced (default-deny) |
 | Least-privilege RBAC | `kubernetes/security/rbac.yaml` | Token enumerating other secrets | Enforced (namespaced, by name) |
-| Workload identity | `kubernetes/base/serviceaccount.yaml` (IRSA) | Node-wide credential blast radius | Enforced |
+| Workload identity | `charts/podinfo/templates/serviceaccount.yaml` (IRSA) | Node-wide credential blast radius | Enforced |
 | Runtime detection | `security/falco/custom-rules.yaml` | Shell, exfil, tampering, token theft | Detect (alert) |
 | DAST | `cicd/cd.yml` (ZAP baseline) | Runtime exposure static analysis misses | Report-only |
 | Cluster CIS audit | `security/cspm/kube-bench-job.yaml` | Node/cluster misconfig vs CIS EKS | Audit (on demand) |

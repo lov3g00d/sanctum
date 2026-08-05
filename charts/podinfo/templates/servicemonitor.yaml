@@ -1,0 +1,23 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "podinfo.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+    release: {{ .Values.serviceMonitor.releaseLabel }}
+spec:
+  # jobLabel maps the Service's app.kubernetes.io/name (=podinfo) onto the target
+  # `job` label, so scraped series carry job="podinfo" and the recording rules,
+  # alerts, dashboards and canary gate keep resolving after the scrape moved off
+  # the static prometheus.yml job.
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      {{- include "podinfo.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

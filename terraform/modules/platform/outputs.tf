@@ -20,6 +20,7 @@ output "installed_charts" {
     var.enable_karpenter ? { "karpenter" = var.karpenter_chart_version } : {},
     var.enable_kube_prometheus_stack ? { "kube-prometheus-stack" = var.kube_prometheus_stack_chart_version } : {},
     var.enable_argocd ? { "argo-cd" = var.argocd_chart_version } : {},
+    var.enable_argo_rollouts ? { "argo-rollouts" = var.argo_rollouts_chart_version } : {},
     var.enable_falco ? { "falco" = var.falco_chart_version } : {},
     var.enable_kyverno ? { "kyverno" = var.kyverno_chart_version } : {},
     var.enable_loki ? { "loki" = var.loki_chart_version } : {},

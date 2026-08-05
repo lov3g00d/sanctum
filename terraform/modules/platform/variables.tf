@@ -80,6 +80,12 @@ variable "enable_argocd" {
   default     = true
 }
 
+variable "enable_argo_rollouts" {
+  description = "Install Argo Rollouts, the progressive-delivery controller for the podinfo Rollout."
+  type        = bool
+  default     = true
+}
+
 variable "enable_falco" {
   description = "Install Falco for runtime threat detection."
   type        = bool
@@ -170,6 +176,12 @@ variable "argocd_chart_version" {
   description = "argo-cd chart version."
   type        = string
   default     = "10.3.0"
+}
+
+variable "argo_rollouts_chart_version" {
+  description = "argo-rollouts chart version."
+  type        = string
+  default     = "2.41.1"
 }
 
 variable "falco_chart_version" {

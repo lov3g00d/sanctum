@@ -1,27 +1,26 @@
----
-# L7 network policy for podinfo, enforced by Cilium's eBPF dataplane. Because the
-# endpointSelector below is matched with both an ingress and an egress section,
+{{- if .Values.ciliumNetworkPolicy.enabled }}
+# L7 network policy for podinfo, enforced by Cilium's eBPF dataplane. The
+# endpointSelector is matched with both an ingress and an egress section, so
 # Cilium applies default-deny in both directions and only the listed flows are
-# allowed. This is the Cilium-native counterpart to the Kubernetes NetworkPolicies
-# in kubernetes/security/networkpolicy.yaml: Cilium enforces those too, this one
-# adds HTTP method/path filtering (GET on the health, readiness, metrics and app
-# paths) that plain NetworkPolicy cannot express.
+# allowed. This adds HTTP method/path filtering that plain NetworkPolicy cannot
+# express; the L3/L4 baseline stays in templates/networkpolicy.yaml.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: podinfo-l7
-  namespace: nimbus
+  name: {{ include "podinfo.fullname" . }}-l7
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
 spec:
   endpointSelector:
     matchLabels:
-      app.kubernetes.io/name: podinfo
-      app.kubernetes.io/component: api
+      {{- include "podinfo.selectorLabels" . | nindent 6 }}
   ingress:
     # ALB IP-target mode connects from the load-balancer ENIs in the public
-    # subnets, so the peer is a CIDR outside cluster identity, not a namespace.
-    # Partner traffic and the ALB health check hit the app and probe paths.
+    # subnets, so the peer is a CIDR outside cluster identity. Partner traffic
+    # and the ALB health check hit the app and probe paths.
     - fromCIDR:
-        - 10.0.0.0/20
+        - {{ .Values.networkPolicy.ingressCidr }}
       toPorts:
         - ports:
             - port: "9898"
@@ -58,3 +57,4 @@ spec:
               protocol: UDP
             - port: "53"
               protocol: TCP
+{{- end }}

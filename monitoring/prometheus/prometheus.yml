@@ -16,7 +16,9 @@ global:
     region: eu-central-1
 
 rule_files:
-  - rules/*.yml
+  # podinfo's recording rules moved into its Helm chart (delivered as a
+  # PrometheusRule); only the global alert rules remain here.
+  - rules/alerts.yml
 
 alerting:
   alertmanagers:
@@ -69,26 +71,9 @@ scrape_configs:
         action: drop
         regex: (Failed|Succeeded)
 
-  - job_name: podinfo
-    metrics_path: /metrics
-    kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names: [nimbus]
-    relabel_configs:
-      # The Service exposes a single port named `http` on 9898; scrape it and
-      # read /metrics off the same port.
-      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-        regex: podinfo;http
-        action: keep
-      - source_labels: [__meta_kubernetes_namespace]
-        target_label: namespace
-      - source_labels: [__meta_kubernetes_pod_name]
-        target_label: pod
-      - source_labels: [__meta_kubernetes_pod_node_name]
-        target_label: node
-      - target_label: job
-        replacement: podinfo
+  # podinfo is scraped via a ServiceMonitor shipped in its Helm chart
+  # (charts/podinfo), which the Prometheus Operator renders into an equivalent
+  # job carrying job="podinfo". It is no longer a static scrape job here.
 
   - job_name: node-exporter
     kubernetes_sd_configs:
