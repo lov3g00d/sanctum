@@ -1,0 +1,144 @@
+---
+name: redteam
+
+# Scheduled offensive assurance, not a merge gate. This never blocks a PR or a
+# deploy: every job is report-only (continue-on-error) and uploads its findings
+# as an artifact for triage. It runs on demand and once a week so control drift
+# (a NetworkPolicy loosened, a Kyverno policy flipped to Audit, a new public
+# endpoint) is caught by an attacker's-eye check between formal reviews.
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Monday 03:00 UTC, after the weekly Prowler CronJob so the two posture
+    # views line up in the same window.
+    - cron: '0 3 * * 1'
+
+# Least privilege at the top: read the repo, nothing else. id-token (OIDC to
+# AWS) is granted per job, only where a job assumes a read-only AWS role.
+permissions:
+  contents: read
+
+concurrency:
+  group: redteam-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: eu-central-1
+  NUCLEI_VERSION: 3.3.7
+
+jobs:
+  kube-hunter:
+    name: kube-hunter (in-cluster recon)
+    runs-on: ubuntu-latest
+    # Report-only. Needs reachability to the EKS API: a hosted runner cannot
+    # reach a private control plane, so run this on a self-hosted runner inside
+    # the VPC (or via a VPN egress). Left here as the wiring; it no-ops cleanly
+    # when the cluster is unreachable because the whole job is continue-on-error.
+    continue-on-error: true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_TF_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: kubeconfig
+        run: aws eks update-kubeconfig --name sanctum-dev --region "${AWS_REGION}"
+
+      - name: run kube-hunter and collect report
+        run: |
+          kubectl apply -f shared/redteam/tools/kube-hunter-job.yaml
+          kubectl -n redteam wait --for=condition=complete job/kube-hunter --timeout=300s
+          kubectl -n redteam logs job/kube-hunter | tee kube-hunter-report.txt
+
+      - name: tear down
+        if: always()
+        run: kubectl delete namespace redteam --ignore-not-found=true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        if: always()
+        with:
+          name: kube-hunter-report
+          path: kube-hunter-report.txt
+          if-no-files-found: ignore
+
+  nuclei-dast:
+    name: nuclei DAST (dev endpoint)
+    runs-on: ubuntu-latest
+    # Template-based active DAST against the dev endpoint, a step beyond the ZAP
+    # passive baseline in cd.yml. Report-only, and no AWS creds: it only needs to
+    # reach the public dev URL. Keep the default read-only token.
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      # Pinned release download instead of a third-party action so what runs is
+      # verifiable by version, consistent with this repo's action-pinning stance.
+      - name: install nuclei
+        run: |
+          cd "$(mktemp -d)"
+          curl -fsSLO "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip"
+          unzip -q "nuclei_${NUCLEI_VERSION}_linux_amd64.zip"
+          install -m 0755 nuclei /usr/local/bin/nuclei
+          nuclei -version
+
+      - name: scan dev endpoint
+        env:
+          TARGET: ${{ vars.DEV_BASE_URL }}
+        run: |
+          # -rl caps request rate to stay polite against the dev deploy.
+          # Medium+ only, to keep the report actionable rather than noisy.
+          nuclei -target "${TARGET}" \
+            -severity medium,high,critical \
+            -rate-limit 30 \
+            -jsonl -output nuclei-report.jsonl
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        if: always()
+        with:
+          name: nuclei-report
+          path: nuclei-report.jsonl
+          if-no-files-found: ignore
+
+  aws-enum:
+    name: aws posture enum (prowler)
+    runs-on: ubuntu-latest
+    # Read-only AWS CSPM sweep via OIDC, the account-side counterpart to the
+    # cluster checks above. Report-only. Uses the read-only OIDC role; that role
+    # should carry SecurityAudit + ViewOnlyAccess for full coverage.
+    continue-on-error: true
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_TF_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: run prowler
+        run: |
+          pip install --quiet prowler
+          # --ignore-exit-code-3 so a failing control is a finding, not a job
+          # failure. Report-only assurance, never a gate.
+          prowler aws \
+            --region "${AWS_REGION}" \
+            --compliance cis_3.0_aws \
+            --output-modes csv,html \
+            --output-directory prowler-report \
+            --ignore-exit-code-3
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        if: always()
+        with:
+          name: prowler-report
+          path: prowler-report/
+          if-no-files-found: ignore

@@ -1,0 +1,49 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: podinfo
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: sanctum
+spec:
+  # Prune Applications whose generator element disappears. Without this, removing
+  # an environment leaves an orphaned Application still syncing.
+  syncPolicy:
+    preserveResourcesOnDeletion: false
+
+  generators:
+    # List generator: one element per environment. Each renders the podinfo Helm
+    # chart with its base values plus the env override file. Add an environment
+    # by adding an element here; there is no per-env manifest directory to author.
+    - list:
+        elements:
+          - env: dev
+          - env: prod
+
+  template:
+    metadata:
+      name: 'podinfo-{{env}}'
+      labels:
+        app.kubernetes.io/part-of: sanctum
+        environment: '{{env}}'
+    spec:
+      project: sanctum
+      source:
+        repoURL: https://github.com/sanctum-org/sanctum.git
+        targetRevision: main
+        path: shared/charts/podinfo
+        helm:
+          valueFiles:
+            - values.yaml
+            - 'values-{{env}}.yaml'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: sanctum
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true

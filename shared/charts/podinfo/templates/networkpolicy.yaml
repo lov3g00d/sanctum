@@ -1,0 +1,78 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "podinfo.fullname" . }}-allow-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "podinfo.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # ALB IP-target mode connects from the load-balancer ENIs in the public
+    # subnets, so the client here is a CIDR, not a controller namespace.
+    - from:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.ingressCidr }}
+      ports:
+        - protocol: TCP
+          port: 9898
+    # Prometheus in the monitoring namespace initiates the scrape.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9898
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "podinfo.fullname" . }}-allow-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "podinfo.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # Namespace default-deny drops DNS too; without this every lookup fails.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # RDS PostgreSQL and ElastiCache Redis: managed-service ENIs in the data
+    # subnets, gated by CIDR + port.
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.dataStoresCidr }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.postgresPort }}
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.redisPort }}
+    # OTLP traces to the OpenTelemetry Collector in monitoring.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.otlpPort }}
+{{- end }}

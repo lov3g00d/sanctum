@@ -1,0 +1,65 @@
+---
+# Routing and grouping for Sanctum alerts. Placeholders (slack_api_url,
+# routing_key) are injected from a Secret at deploy time, never committed.
+global:
+  resolve_timeout: 5m
+  # Global default so per-receiver slack_configs stay terse.
+  slack_api_url: 'https://hooks.slack.com/services/PLACEHOLDER/SLACK/WEBHOOK'
+
+route:
+  receiver: slack-alerts
+  # One notification per alert per cluster/namespace, so a node draining a dozen
+  # pods collapses into a single grouped message instead of a dozen.
+  group_by: [alertname, cluster, namespace]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Pages route first and short-circuit. "critical" is accepted alongside
+    # "page" so vendored kubernetes-mixin rules (which emit critical/warning)
+    # route sanely without rewriting their labels.
+    - receiver: pagerduty
+      matchers:
+        - severity =~ "page|critical"
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 1h
+    - receiver: slack-alerts
+      matchers:
+        - severity =~ "ticket|warning|info"
+
+inhibit_rules:
+  # A page for a given alert silences the ticket-level noise for the same object;
+  # equal on the labels present on both sides.
+  - source_matchers:
+      - severity = page
+    target_matchers:
+      - severity = ticket
+    equal: [alertname, cluster, namespace]
+
+  # A dead node produces its own NotReady page-path signal; suppress the pod
+  # churn it causes on that node. Requires the pod alerts to carry a node label
+  # (joined via kube_pod_info in prometheus-rules.yaml).
+  - source_matchers:
+      - alertname = NodeNotReady
+    target_matchers:
+      - alertname =~ "KubePodCrashLooping|KubePodNotReady"
+    equal: [cluster, node]
+
+receivers:
+  - name: slack-alerts
+    slack_configs:
+      - channel: '#sanctum-alerts'
+        send_resolved: true
+        title: '{{ .CommonLabels.alertname }} ({{ .Status }})'
+        text: >-
+          {{ range .Alerts }}*{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          <{{ .Annotations.runbook_url }}|runbook>
+          {{ end }}
+
+  - name: pagerduty
+    pagerduty_configs:
+      - routing_key: 'PLACEHOLDER_PAGERDUTY_ROUTING_KEY'
+        send_resolved: true
+        description: '{{ .CommonLabels.alertname }} in {{ .CommonLabels.namespace }}'

@@ -1,0 +1,33 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Sanctum platform.
+# MITRE ATT&CK for Containers: T1610 Deploy Container.
+# Attempt: run a container as UID 0 with no securityContext hardening in
+# namespace sanctum. Root in the container plus a container-runtime CVE is a
+# common escape path, and root inside is never needed by this workload.
+# Expected outcome: REJECTED at admission. PSA "restricted" and Kyverno
+# require-run-as-non-root / require-readonly-rootfs / require-drop-all-
+# capabilities / require-resource-limits each reject this. The pod never
+# schedules.
+# This manifest is built to fail admission. That rejection is the PASS.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-03-run-as-root
+  namespace: sanctum
+  labels:
+    redteam.sanctum/controlled-test: "true"
+    redteam.sanctum/control-class: admission-deny
+    app.kubernetes.io/part-of: sanctum-redteam
+  annotations:
+    redteam.sanctum/mitre: T1610
+    redteam.sanctum/mitre-name: Deploy Container
+    redteam.sanctum/control: PSA restricted + Kyverno require-run-as-non-root
+    redteam.sanctum/expected: Admission DENY - runAsNonRoot required, root and writable rootfs rejected
+spec:
+  restartPolicy: Never
+  containers:
+    - name: attacker
+      image: docker.io/library/busybox:1.37.0
+      command: ["sh", "-c", "id && sleep 3600"]
+      securityContext:
+        runAsUser: 0

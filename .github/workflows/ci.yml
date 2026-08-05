@@ -1,0 +1,188 @@
+---
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+# Read-only by default. No job in CI writes to the repo, publishes packages,
+# or touches cloud: findings go to the check summary and to build artifacts,
+# never to code scanning (which would need security-events: write).
+permissions:
+  contents: read
+
+# One in-flight run per PR branch. A new push cancels the stale run so we do
+# not burn minutes scanning a commit that is already superseded.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint (fmt, tflint, yaml, shell, docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+        with:
+          terraform_wrapper: false
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive chambers/aws-eks/terraform/
+
+      - uses: terraform-linters/setup-tflint@6e1e0642c0289bd619021bf6b34e3c08ed1e005a  # v6.3.0
+
+      - name: tflint
+        run: |
+          tflint --init
+          tflint --recursive --minimum-failure-severity=warning
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: yamllint
+        run: |
+          python -m pip install --quiet yamllint
+          yamllint -c .yamllint .
+
+      - name: shellcheck
+        run: |
+          # No -o pipefail guard needed: find prints null-delimited, xargs -r
+          # skips the run entirely when scripts/ has no shell files.
+          find scripts -type f \( -name '*.sh' -o -name '*.bash' \) -print0 \
+            | xargs -0 -r shellcheck --severity=warning
+
+      - name: hadolint podinfo
+        uses: hadolint/hadolint-action@2a66e89f53d0771bb131a7fa31f3136336094aa6  # v3.4.0
+        with:
+          dockerfile: shared/docker/podinfo.Dockerfile
+          failure-threshold: warning
+
+  sast:
+    name: sast (semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: semgrep
+        run: |
+          python -m pip install --quiet semgrep
+          # --error makes a finding fail the job (fail-closed). Run offline
+          # with no login so no SEMGREP_APP_TOKEN or SaaS round-trip is needed.
+          semgrep scan \
+            --config p/ci \
+            --config p/owasp-top-ten \
+            --metrics off \
+            --error \
+            --sarif --output semgrep.sarif .
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: ignore
+
+  sca-secrets:
+    name: sca + secrets (trivy fs, gitleaks)
+    runs-on: ubuntu-latest
+    # gitleaks-action reads the PR's commit list via the API on pull_request runs,
+    # which the top-level contents:read default does not cover. A job-scoped grant
+    # keeps every other job read-only.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # gitleaks scans commit history, so it needs the full clone.
+          fetch-depth: 0
+
+      - name: trivy filesystem
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          # shared/redteam/ holds deliberately-insecure attack fixtures, not shipped
+          # config, so they are excluded from the misconfig gate.
+          skip-dirs: shared/redteam
+          # trivy misreads per-Dockerfile .dockerignore files as Dockerfiles and
+          # errors on their glob patterns; they carry no config to scan.
+          skip-files: "**/*.dockerignore"
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
+        env:
+          # Required: the action reads it to enumerate the PR's commits.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Any leak fails the job. GITLEAKS_LICENSE is only required when the
+          # repo lives under a GitHub org; harmless to leave unset otherwise.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  iac:
+    name: iac (checkov, trivy config)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf  # v12.1347.0
+        with:
+          directory: chambers/aws-eks/terraform/
+          framework: terraform
+          # Hard gate. A misconfig fails the PR rather than logging a warning.
+          soft_fail: false
+          output_format: cli
+          quiet: true
+
+      - name: trivy config
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: chambers/aws-eks/terraform/
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+
+  build-scan:
+    name: build + image scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: build image (local, not pushed)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          file: shared/docker/podinfo.Dockerfile
+          push: false
+          load: true
+          tags: sanctum/podinfo:${{ github.sha }}
+
+      - name: trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          scan-type: image
+          image-ref: sanctum/podinfo:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: sbom (spdx-json)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
+        with:
+          image: sanctum/podinfo:${{ github.sha }}
+          format: spdx-json
+          artifact-name: sbom-podinfo.spdx.json
+          output-file: sbom-podinfo.spdx.json

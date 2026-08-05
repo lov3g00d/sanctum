@@ -1,0 +1,18 @@
+---
+# GitHub Actions workflows use `on:` as a key, which yamllint's default
+# truthy rule flags as a boolean. check-keys:false keeps that legal while
+# still catching stray yes/no values inside step inputs. Line length is
+# unbounded because pinned action SHAs plus a version comment run long.
+extends: default
+
+rules:
+  line-length: disable
+  truthy:
+    check-keys: false
+  document-start:
+    present: true
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  braces:
+    max-spaces-inside: 1

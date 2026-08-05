@@ -1,0 +1,59 @@
+---
+# Admission-side provenance check. cd.yml build-push now runs
+# `cosign attest --type spdxjson` after signing, attaching the syft SBOM to the
+# image as an spdxjson in-toto attestation under the same keyless OIDC identity.
+# This policy is the counterpart: it admits an image only if it carries that
+# attestation, signed by the CI identity. Sign the SBOM without verifying it and
+# the attestation is decoration; verify without attesting and nothing deploys.
+#
+# ROLLOUT: ships Audit deliberately. failureAction Audit reports missing or
+# unverifiable attestations in PolicyReports without blocking a deploy, so the
+# attestation coverage can be confirmed cluster-wide before promoting to Enforce.
+# It is a real verifyImages check now, not a placeholder: flipping the one field
+# is the only step left to enforce it.
+#
+# Same ECR-credentials dependency as verify-images.yaml: the Kyverno SA needs
+# read access to the sanctum ECR repo to fetch the attestation.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-sbom-attestation
+  annotations:
+    policies.kyverno.io/title: Require SPDX SBOM attestation
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: medium
+spec:
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: require-sanctum-sbom
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kube-node-lease
+                - kube-public
+      verifyImages:
+        - imageReferences:
+            - "*.dkr.ecr.eu-central-1.amazonaws.com/sanctum/*"
+          failureAction: Audit
+          # Verify only: do not mutate the digest from an aspirational rule.
+          mutateDigest: false
+          verifyDigest: false
+          attestations:
+            # cosign --type spdxjson stamps this predicateType on the attestation.
+            - predicateType: https://spdx.dev/Document
+              attestors:
+                - count: 1
+                  entries:
+                    - keyless:
+                        subjectRegExp: "^https://github\\.com/sanctum-org/sanctum/\\.github/workflows/cd\\.yml@refs/(heads/main|tags/v.+)$"
+                        issuer: "https://token.actions.githubusercontent.com"
+                        rekor:
+                          url: https://rekor.sigstore.dev

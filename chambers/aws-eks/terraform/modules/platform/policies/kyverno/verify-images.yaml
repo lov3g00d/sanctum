@@ -1,0 +1,71 @@
+---
+# Closes the supply-chain loop from cicd/: cd.yml signs every pushed image by
+# digest with cosign keyless (Fulcio/Rekor, GitHub OIDC). This ClusterPolicy is
+# the admission-time counterpart: the cluster runs only images that carry a
+# valid signature from that CI identity. Sign without verifying and the
+# signature is decoration; verify without signing and nothing deploys.
+#
+# ROLLOUT: shipped Enforce. On an existing cluster flip failureAction to Audit
+# first, watch PolicyReports for images that would be blocked, then promote.
+#
+# ECR CREDENTIALS (the thing that breaks this in practice): to fetch the
+# signature and (with mutateDigest) resolve the digest, the Kyverno
+# admission-controller ServiceAccount must be able to pull from the private
+# sanctum ECR repo. Grant it via IRSA (ecr:GetAuthorizationToken,
+# ecr:BatchGetImage, ecr:GetDownloadUrlForLayer scoped to the repo) or an
+# imagePullSecrets entry on this rule. With failureAction Enforce, missing ECR
+# read means admission fails closed and nothing schedules.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Verify sanctum image signatures
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  # verifyImages mutates the pod (tag -> digest) and calls out to Fulcio/Rekor,
+  # so it cannot run in background scan mode.
+  background: false
+  # Admission stays closed if the webhook errors, consistent with failing on an
+  # unverifiable image. Bump if Rekor round-trips push admission latency.
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: verify-sanctum-ecr-cosign
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kube-node-lease
+                - kube-public
+      verifyImages:
+        # Scope to the sanctum ECR repo only. Sidecars and system images pulled
+        # from elsewhere (public registries) are out of scope for this policy.
+        - imageReferences:
+            - "*.dkr.ecr.eu-central-1.amazonaws.com/sanctum/*"
+          failureAction: Enforce
+          # Rewrite the tag to the verified digest at admission so what runs is
+          # pinned to the artifact that was actually verified, not a tag that
+          # can be repointed in ECR afterwards.
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                # cd.yml build-push runs on push:main and tags:v*, so the
+                # signing cert SAN is the cd workflow at either ref. The regexp
+                # accepts both and nothing else.
+                # sanctum-org/sanctum is a placeholder: set it to the real
+                # org/repo, same as <acct> elsewhere in this repo.
+                - keyless:
+                    subjectRegExp: "^https://github\\.com/sanctum-org/sanctum/\\.github/workflows/cd\\.yml@refs/(heads/main|tags/v.+)$"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor:
+                      url: https://rekor.sigstore.dev

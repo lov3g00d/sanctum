@@ -1,0 +1,35 @@
+{{- if .Values.ingress.enabled }}
+# AWS Load Balancer Controller (ALB). target-type ip sends traffic from the ALB
+# ENIs straight to pod IPs, so the NetworkPolicy ingress rule gates the
+# load-balancer subnet CIDR, not a namespace.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "podinfo.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.ingress.certificateArn }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ . }}
+    {{- end }}
+    {{- with .Values.ingress.wafAclArn }}
+    alb.ingress.kubernetes.io/wafv2-acl-arn: {{ . }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "podinfo.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

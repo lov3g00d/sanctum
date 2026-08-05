@@ -1,0 +1,182 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "podinfo.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusRule.releaseLabel }}
+spec:
+  groups:
+    # Precomputed RED and SLI series for podinfo. Naming follows
+    # level:metric:operation. podinfo's http_requests_total carries only a
+    # `status` label, so per-path RED comes from the
+    # http_request_duration_seconds histogram `_count`.
+    - name: podinfo-red.rules
+      interval: 30s
+      rules:
+        - record: path:http_requests:rate5m
+          expr: |
+            sum by (namespace, path) (
+              rate(http_request_duration_seconds_count{job="podinfo"}[5m])
+            )
+
+        - record: path:http_requests_errors:rate5m
+          expr: |
+            sum by (namespace, path) (
+              rate(http_request_duration_seconds_count{job="podinfo", status=~"5.."}[5m])
+            )
+
+        - record: path:http_requests:error_ratio5m
+          expr: |
+            path:http_requests_errors:rate5m
+              / path:http_requests:rate5m
+
+        - record: path:http_request_duration_seconds:p50
+          expr: |
+            histogram_quantile(0.50,
+              sum by (namespace, path, le) (
+                rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
+              )
+            )
+
+        - record: path:http_request_duration_seconds:p95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (namespace, path, le) (
+                rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
+              )
+            )
+
+        - record: path:http_request_duration_seconds:p99
+          expr: |
+            histogram_quantile(0.99,
+              sum by (namespace, path, le) (
+                rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
+              )
+            )
+
+        - record: job:http_request_duration_seconds:p99
+          expr: |
+            histogram_quantile(0.99,
+              sum by (namespace, le) (
+                rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
+              )
+            )
+
+    # SLI for the 99.9% availability SLO. "error" = server-side failure (5xx);
+    # 4xx is the caller's fault and does not burn our budget. The four windows
+    # are the ones the multi-window burn-rate alerts pair up (5m/1h fast,
+    # 30m/6h slow). Division by an empty selector yields NaN when there is no
+    # traffic, which keeps the alerts from firing on an idle service.
+    - name: podinfo-slo.rules
+      interval: 30s
+      rules:
+        - record: slo:sli_error:ratio_rate5m
+          expr: |
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo", status=~"5.."}[5m])
+            )
+            /
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo"}[5m])
+            )
+
+        - record: slo:sli_error:ratio_rate30m
+          expr: |
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo", status=~"5.."}[30m])
+            )
+            /
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo"}[30m])
+            )
+
+        - record: slo:sli_error:ratio_rate1h
+          expr: |
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo", status=~"5.."}[1h])
+            )
+            /
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo"}[1h])
+            )
+
+        - record: slo:sli_error:ratio_rate6h
+          expr: |
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo", status=~"5.."}[6h])
+            )
+            /
+            sum by (namespace) (
+              rate(http_requests_total{job="podinfo"}[6h])
+            )
+
+    - name: podinfo-slo.alerts
+      rules:
+        # Google SRE multi-window, multi-burn-rate. Budget for a 99.9% SLO is
+        # 0.001. 14.4x burn over 1h exhausts ~2% of a 30-day budget in an hour;
+        # the 5m window must agree so a resolved blip stops paging fast.
+        - alert: PodinfoErrorBudgetBurnFast
+          expr: |
+            slo:sli_error:ratio_rate1h{namespace="sanctum"} > (14.4 * 0.001)
+            and
+            slo:sli_error:ratio_rate5m{namespace="sanctum"} > (14.4 * 0.001)
+          for: 2m
+          labels:
+            severity: page
+            service: podinfo
+          annotations:
+            summary: podinfo error budget burning fast (>14.4x)
+            description: >
+              5xx ratio over 1h and 5m both exceed 14.4x the 99.9% SLO budget.
+              At this rate 2% of the 30-day error budget is gone within an hour.
+            runbook_url: https://runbooks.sanctum.example.com/podinfo/error-budget-burn
+
+        # 6x burn over 6h spends ~5% of the budget; slow enough to be a ticket,
+        # the 30m window keeps it from lingering after recovery.
+        - alert: PodinfoErrorBudgetBurnSlow
+          expr: |
+            slo:sli_error:ratio_rate6h{namespace="sanctum"} > (6 * 0.001)
+            and
+            slo:sli_error:ratio_rate30m{namespace="sanctum"} > (6 * 0.001)
+          for: 15m
+          labels:
+            severity: ticket
+            service: podinfo
+          annotations:
+            summary: podinfo error budget burning (>6x)
+            description: >
+              5xx ratio over 6h and 30m both exceed 6x the 99.9% SLO budget.
+              Sustained; budget will be exhausted well before the window closes.
+            runbook_url: https://runbooks.sanctum.example.com/podinfo/error-budget-burn
+
+    - name: podinfo-symptoms.alerts
+      rules:
+        # Blunt backstop for a hard outage the burn-rate math would also catch,
+        # kept because a single obvious threshold is easy to reason about at 3am.
+        - alert: HighErrorRate
+          expr: |
+            slo:sli_error:ratio_rate5m{namespace="sanctum"} > 0.05
+          for: 10m
+          labels:
+            severity: page
+            service: podinfo
+          annotations:
+            summary: podinfo 5xx ratio above 5%
+            description: 'More than 5% of requests are failing (5xx) over the last 5m.'
+            runbook_url: https://runbooks.sanctum.example.com/podinfo/high-error-rate
+
+        - alert: HighLatencyP99
+          expr: |
+            job:http_request_duration_seconds:p99{namespace="sanctum"} > 1
+          for: 10m
+          labels:
+            severity: ticket
+            service: podinfo
+          annotations:
+            summary: podinfo p99 latency above 1s
+            description: '99th percentile request latency has exceeded 1s for 10m.'
+            runbook_url: https://runbooks.sanctum.example.com/podinfo/high-latency
+{{- end }}

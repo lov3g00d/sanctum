@@ -1,0 +1,24 @@
+# dev: fewer replicas, smaller footprint, debug logging, soft topology spread.
+
+replicaCount: 2
+
+image:
+  tag: dev-a1b2c3d
+
+config:
+  logLevel: debug
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 250m
+    memory: 192Mi
+
+topologySpread:
+  whenUnsatisfiable: ScheduleAnyway
+
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 5

@@ -1,0 +1,178 @@
+---
+name: terraform
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['chambers/aws-eks/terraform/**']
+  push:
+    branches: [main]
+    paths: ['chambers/aws-eks/terraform/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  TG_VERSION: v1.1.2
+
+jobs:
+  plan:
+    name: plan (${{ matrix.environment }})
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+    permissions:
+      contents: read
+      # id-token: write assumes the read-only plan role; pull-requests: write
+      # lets github-script post the plan back as a review comment.
+      id-token: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: chambers/aws-eks/terraform/live/${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_TF_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+
+      - name: setup terragrunt
+        run: |
+          curl -sSLo /usr/local/bin/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/${TG_VERSION}/terragrunt_linux_amd64"
+          chmod +x /usr/local/bin/terragrunt
+        working-directory: .
+
+      - name: fmt
+        run: terragrunt hcl fmt --check --diff
+
+      - name: validate
+        run: terragrunt hcl validate --all
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf  # v12.1347.0
+        with:
+          directory: chambers/aws-eks/terraform
+          framework: terraform
+          soft_fail: false
+          output_format: cli
+          quiet: true
+
+      - name: plan
+        id: plan
+        run: terragrunt run --all --non-interactive -- plan -input=false -no-color
+        continue-on-error: true
+
+      - name: comment plan
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+          TARGET_ENV: ${{ matrix.environment }}
+          OUTCOME: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const body = [
+              `### terragrunt plan \`${process.env.TARGET_ENV}\` - ${process.env.OUTCOME}`,
+              '',
+              '<details><summary>Show plan</summary>',
+              '',
+              '```',
+              (process.env.PLAN || '(no output)').slice(0, 60000),
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: fail on plan error
+        # Comment first, then surface the failure. continue-on-error above only
+        # defers it so a broken plan still posts its diagnostics to the PR.
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  cost:
+    name: cost estimate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Infracost parses the Terragrunt HCL statically, so this job needs no cloud
+    # credentials or plan: contents:read to check out, pull-requests:write to comment.
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: infracost/actions/setup@e9d6e6cd65e168e76b0de50ff9957d2fe8bb1832  # v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: breakdown
+        run: >-
+          infracost breakdown --config-file=infracost.yml
+          --format=json --out-file=/tmp/infracost.json
+
+      - name: comment
+        # Posts (or updates) a single PR comment with the monthly cost and the diff.
+        run: >-
+          infracost comment github --path=/tmp/infracost.json
+          --repo=$GITHUB_REPOSITORY
+          --pull-request=${{ github.event.pull_request.number }}
+          --github-token=${{ github.token }}
+          --behavior=update
+
+  apply:
+    name: apply (${{ matrix.environment }})
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Apply dev before prod so a bad change is caught in the lower
+      # environment before prod's approval is even requested.
+      max-parallel: 1
+      matrix:
+        environment: [dev, prod]
+    # Same GitHub Environment as the deploy: the required-reviewers rule on
+    # `prod` blocks apply until approved. `dev` can auto-run or gate as needed.
+    environment: ${{ matrix.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: chambers/aws-eks/terraform/live/${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_TF_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+
+      - name: setup terragrunt
+        run: |
+          curl -sSLo /usr/local/bin/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/${TG_VERSION}/terragrunt_linux_amd64"
+          chmod +x /usr/local/bin/terragrunt
+        working-directory: .
+
+      - name: apply
+        run: terragrunt run --all --non-interactive -- apply -input=false -auto-approve

@@ -1,0 +1,41 @@
+{{- if .Values.rollout.enabled }}
+# SLO gate for the podinfo canary. Both metrics query the precomputed recording
+# rules from the PrometheusRule, which aggregate `by (namespace)`, so
+# `{namespace="sanctum"}` returns a single series and result[0] is well defined.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ include "podinfo.fullname" . }}-slo
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "podinfo.labels" . | nindent 4 }}
+spec:
+  metrics:
+    # failureCondition (not successCondition) on purpose: the recording rules
+    # yield NaN on an idle service, and a NaN measurement satisfies neither a
+    # threshold comparison. With failureCondition-only, a non-failing sample
+    # (including NaN) is scored Successful, so an idle canary auto-passes instead
+    # of burning the failureLimit. failureLimit: 1 rides out a single scrape blip
+    # but aborts on a sustained breach.
+    - name: error-ratio
+      interval: 1m
+      count: 5
+      failureLimit: 1
+      failureCondition: result[0] > 0.01
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.monitoring:9090
+          query: |
+            slo:sli_error:ratio_rate5m{namespace="sanctum"}
+
+    - name: p99-latency
+      interval: 1m
+      count: 5
+      failureLimit: 1
+      failureCondition: result[0] > 1
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.monitoring:9090
+          query: |
+            job:http_request_duration_seconds:p99{namespace="sanctum"}
+{{- end }}

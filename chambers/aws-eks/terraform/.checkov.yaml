@@ -1,0 +1,18 @@
+framework:
+  - terraform
+directory:
+  - .
+compact: true
+quiet: true
+download-external-modules: false
+soft-fail: false
+
+# Fail the run on these severities and above.
+hard-fail-on:
+  - HIGH
+  - CRITICAL
+
+skip-check:
+  # EKS public endpoint is intentionally reachable but restricted to
+  # public_access_cidrs, never 0.0.0.0/0. The CIDR restriction is the control.
+  - CKV_AWS_39

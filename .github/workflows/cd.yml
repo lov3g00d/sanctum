@@ -1,0 +1,176 @@
+---
+name: cd
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+# Least privilege at the top: read the repo, nothing else. OIDC (id-token)
+# and any wider scope are granted per job, only where a job actually assumes
+# an AWS role or signs an image.
+permissions:
+  contents: read
+
+# Serialize deploys per ref and never cancel one in flight: interrupting a
+# kubectl apply or a rollout mid-way leaves the cluster half-updated.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.eu-central-1.amazonaws.com
+
+jobs:
+  build-push:
+    name: build, push, sign
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # id-token: write is needed twice here: to assume the AWS role via OIDC,
+      # and for cosign keyless signing (Fulcio reads the same GitHub OIDC token).
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64  # v2.1.6
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
+
+      - name: build and push
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          file: shared/docker/podinfo.Dockerfile
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/sanctum/podinfo:${{ github.sha }}
+          provenance: true
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
+
+      - name: cosign sign (keyless)
+        env:
+          IMAGE: ${{ env.ECR_REGISTRY }}/sanctum/podinfo
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          # Sign by immutable digest, not tag: a tag can be repointed after
+          # signing, a digest cannot. Signature and cert land in the OIDC log.
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: sbom (spdx-json)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
+        with:
+          image: ${{ env.ECR_REGISTRY }}/sanctum/podinfo@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: cosign attest sbom (keyless)
+        env:
+          IMAGE: ${{ env.ECR_REGISTRY }}/sanctum/podinfo
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          # Attach the SBOM to the image as an spdxjson in-toto attestation, signed
+          # by the same keyless OIDC identity as the signature above and logged in
+          # Rekor. This is what the Kyverno require-sbom-attestation policy verifies
+          # at admission. Attest by digest for the same reason we sign by digest.
+          cosign attest --yes --predicate sbom.spdx.json \
+            --type spdxjson "${IMAGE}@${DIGEST}"
+
+  deploy-dev:
+    name: deploy dev
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: kubeconfig
+        run: aws eks update-kubeconfig --name sanctum-dev --region "${AWS_REGION}"
+
+      - name: set image tag and apply
+        run: |
+          # Direct CI apply pins rollout.enabled=false so the chart renders a
+          # Deployment we can wait on with `kubectl rollout status`. The Argo
+          # Rollout path is driven by ArgoCD (shared/gitops/), not this pipeline.
+          helm upgrade --install podinfo shared/charts/podinfo \
+            --namespace sanctum --create-namespace \
+            -f shared/charts/podinfo/values.yaml -f shared/charts/podinfo/values-dev.yaml \
+            --set rollout.enabled=false \
+            --set image.repository="${ECR_REGISTRY}/sanctum/podinfo" \
+            --set image.tag="${GITHUB_SHA}"
+          kubectl -n sanctum rollout status deployment/podinfo --timeout=300s
+
+  dast-dev:
+    name: dast baseline (zap)
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    # No AWS creds: ZAP only needs to reach the public dev endpoint. Keep the
+    # default read-only token so a scan cannot mutate the repo.
+    permissions:
+      contents: read
+    steps:
+      - name: zap baseline
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25  # v0.15.0
+        with:
+          target: ${{ vars.DEV_BASE_URL }}
+          # Report-only. A baseline scan flags passively; it does not fail the
+          # pipeline on alerts, and it does not open GitHub issues (which would
+          # need issues: write). Findings are triaged from the report artifact.
+          fail_action: false
+          allow_issue_writing: false
+
+  deploy-prod:
+    name: deploy prod
+    needs: dast-dev
+    runs-on: ubuntu-latest
+    # `environment: prod` binds this job to the prod Environment. Its required
+    # reviewers rule holds the job here until a human approves: this is the
+    # manual gate, enforced by GitHub, not by anything in this file.
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: kubeconfig
+        run: aws eks update-kubeconfig --name sanctum-prod --region "${AWS_REGION}"
+
+      - name: set image tag and apply
+        run: |
+          # Direct CI apply pins rollout.enabled=false so the chart renders a
+          # Deployment we can wait on with `kubectl rollout status`. The Argo
+          # Rollout path is driven by ArgoCD (shared/gitops/), not this pipeline.
+          helm upgrade --install podinfo shared/charts/podinfo \
+            --namespace sanctum --create-namespace \
+            -f shared/charts/podinfo/values.yaml -f shared/charts/podinfo/values-prod.yaml \
+            --set rollout.enabled=false \
+            --set image.repository="${ECR_REGISTRY}/sanctum/podinfo" \
+            --set image.tag="${GITHUB_SHA}"
+          kubectl -n sanctum rollout status deployment/podinfo --timeout=300s
+
+      # Rollback: `kubectl rollout status` above fails the job if a new
+      # ReplicaSet never goes Ready, but it does not revert. To roll back:
+      #   kubectl -n sanctum rollout undo deployment/podinfo
+      # Under ArgoCD the equivalent is `argocd app rollback podinfo-prod <id>`,
+      # or enable automated self-heal so drift is reverted to the pinned SHA.

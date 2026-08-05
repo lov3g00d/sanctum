@@ -1,0 +1,21 @@
+# Necessary exceptions. shared/redteam/ attack fixtures are excluded via skip-dirs on
+# the trivy-action, not here. Each id below is a documented, required deviation
+# on a specific workload; keep this list tight and re-triage on any bump.
+
+# chambers/aws-eks/terraform/modules/vpc/main.tf: public subnets host the internet-facing NLB and
+# NAT gateways, which require auto-assigned public IPs. Private subnets do not.
+AWS-0164
+
+# modules/eks -> terraform-aws-modules/eks node security group. trivy resolves the
+# module call and flags the upstream "egress_all" rule (0.0.0.0/0). EKS worker
+# nodes require outbound to pull images and reach the AWS API/STS/ECR endpoints;
+# this is the module's default node SG and is not ours to tighten per-rule.
+AWS-0104
+
+# chambers/aws-eks/terraform/modules/platform/policies/cspm/kube-bench-job.yaml: kube-bench reads
+# kubelet config and process args off the host, so it needs hostPID, a writable
+# root fs, and root. It cannot satisfy the restricted PodSecurity baseline; that
+# is the whole point of running it. See the header comment in that manifest.
+KSV-0010
+KSV-0014
+KSV-0118
