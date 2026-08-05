@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nimbus-orders-api-config
+  namespace: nimbus
+data:
+  NODE_ENV: development
+  LOG_LEVEL: debug
+  PGHOST: nimbus-dev.abc123.eu-central-1.rds.amazonaws.com
+  REDIS_HOST: nimbus-dev.abc123.euc1.cache.amazonaws.com

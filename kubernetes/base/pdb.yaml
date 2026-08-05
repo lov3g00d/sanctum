@@ -1,0 +1,14 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nimbus-orders-api
+  namespace: nimbus
+spec:
+  # Percentage so a single PDB travels across overlays without deadlocking the
+  # smaller dev replica count (2 -> allows 1 voluntary eviction).
+  minAvailable: 50%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nimbus-orders-api
+      app.kubernetes.io/component: api

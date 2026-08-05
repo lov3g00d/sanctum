@@ -1,0 +1,27 @@
+# BuildKit reads <Dockerfile>.dockerignore next to the Dockerfile when the build
+# context is the repo root. Patterns are relative to the context (repo root).
+**/.git
+**/.gitignore
+**/node_modules
+**/.env
+**/.env.*
+**/*.log
+**/dist
+**/build
+**/coverage
+**/.nyc_output
+**/.pytest_cache
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/tests
+**/test
+**/*.md
+**/.DS_Store
+terraform/
+kubernetes/
+monitoring/
+cicd/
+scripts/
+docs/

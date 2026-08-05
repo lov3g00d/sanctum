@@ -1,0 +1,90 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: nimbus
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: nimbus
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # default-deny above drops DNS too; without this every name lookup fails.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-orders-api-ingress
+  namespace: nimbus
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nimbus-orders-api
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Ingress
+  ingress:
+    # ALB IP-target mode connects from the load-balancer ENIs in the public
+    # subnets, so the client here is a CIDR, not a controller namespace.
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/20
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Prometheus in the monitoring namespace initiates the scrape, so metrics
+    # collection is an ingress rule to the same container port.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-data-stores-egress
+  namespace: nimbus
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nimbus-orders-api
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Egress
+  egress:
+    # RDS PostgreSQL and ElastiCache Redis are managed services with ENIs in the
+    # data subnets; egress is gated by CIDR + port, not by pod selector.
+    - to:
+        - ipBlock:
+            cidr: 10.0.32.0/20
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379

@@ -1,0 +1,15 @@
+---
+# Dashboard provider. Grafana loads every JSON under the path below and keeps it
+# in sync on disk changes; foldersFromFilesStructure keeps the on-disk layout.
+apiVersion: 1
+
+providers:
+  - name: nimbus
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

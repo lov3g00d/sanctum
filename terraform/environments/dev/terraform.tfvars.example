@@ -1,0 +1,17 @@
+account_id = "123456789012"
+region     = "eu-central-1"
+
+# CIDRs allowed to reach the EKS public API endpoint. Keep this to your office / VPN
+# ranges. Never 0.0.0.0/0.
+eks_public_access_cidrs = ["203.0.113.0/24"]
+eks_admin_arns          = ["arn:aws:iam::123456789012:role/platform-admin"]
+
+cloudflare_zone_id         = "0123456789abcdef0123456789abcdef"
+cloudflare_origin_hostname = "dev-orders-api.eu-central-1.elb.amazonaws.com"
+
+# The CI role is only assumable from this repo and ref.
+github_subject_claims = ["repo:nimbus-org/nimbus:ref:refs/heads/main"]
+
+# Secret: do not put this in a committed tfvars. Prefer:
+#   export TF_VAR_cloudflare_api_token=...
+# cloudflare_api_token = "..."

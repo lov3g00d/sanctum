@@ -1,0 +1,31 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nimbus-orders-api
+  namespace: nimbus
+rules:
+  # Read-only, and scoped by resourceNames to the workload's own objects so the
+  # token cannot enumerate other secrets in the namespace.
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [nimbus-orders-api-config]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [nimbus-orders-api-secrets]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nimbus-orders-api
+  namespace: nimbus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nimbus-orders-api
+subjects:
+  - kind: ServiceAccount
+    name: nimbus-orders-api
+    namespace: nimbus

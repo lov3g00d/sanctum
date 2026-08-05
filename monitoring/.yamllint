@@ -1,0 +1,16 @@
+---
+extends: default
+
+rules:
+  # PromQL expressions and long relabel regexes routinely exceed 80 cols.
+  line-length: disable
+  document-start: disable
+  comments-indentation: disable
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    check-keys: false
+  braces:
+    max-spaces-inside: 1
+  brackets:
+    max-spaces-inside: 1

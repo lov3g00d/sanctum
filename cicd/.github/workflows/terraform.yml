@@ -1,0 +1,139 @@
+---
+name: terraform
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['terraform/**']
+  push:
+    branches: [main]
+    paths: ['terraform/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+
+jobs:
+  plan:
+    name: plan (${{ matrix.environment }})
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+    permissions:
+      contents: read
+      # id-token: write assumes the read-only plan role; pull-requests: write
+      # lets github-script post the plan back as a review comment.
+      id-token: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: terraform/environments/${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_TF_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+
+      - name: fmt
+        run: terraform fmt -check -recursive
+
+      - name: init
+        run: terraform init -input=false
+
+      - name: validate
+        run: terraform validate -no-color
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf  # v12.1347.0
+        with:
+          directory: terraform/environments/${{ matrix.environment }}
+          framework: terraform
+          soft_fail: false
+          output_format: cli
+          quiet: true
+
+      - name: plan
+        id: plan
+        run: terraform plan -input=false -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: comment plan
+        uses: actions/github-script@v9
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+          TARGET_ENV: ${{ matrix.environment }}
+          OUTCOME: ${{ steps.plan.outcome }}
+        with:
+          script: |
+            const body = [
+              `### terraform plan \`${process.env.TARGET_ENV}\` - ${process.env.OUTCOME}`,
+              '',
+              '<details><summary>Show plan</summary>',
+              '',
+              '```',
+              (process.env.PLAN || '(no output)').slice(0, 60000),
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: fail on plan error
+        # Comment first, then surface the failure. continue-on-error above only
+        # defers it so a broken plan still posts its diagnostics to the PR.
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  apply:
+    name: apply (${{ matrix.environment }})
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Apply dev before prod so a bad change is caught in the lower
+      # environment before prod's approval is even requested.
+      max-parallel: 1
+      matrix:
+        environment: [dev, prod]
+    # Same GitHub Environment as the deploy: the required-reviewers rule on
+    # `prod` blocks apply until approved. `dev` can auto-run or gate as needed.
+    environment: ${{ matrix.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: terraform/environments/${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_TF_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
+
+      - name: init
+        run: terraform init -input=false
+
+      - name: apply
+        run: terraform apply -input=false -auto-approve

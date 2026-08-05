@@ -1,0 +1,105 @@
+---
+# Precomputed RED and SLI series for nimbus-orders-api. Recording rules keep the
+# dashboards and burn-rate alerts cheap (the histogram_quantile and ratio work
+# happens once per evaluation, not on every query) and give the alerts a stable
+# series name to reference. Naming follows level:metric:operation.
+groups:
+  - name: orders-api-red.rules
+    interval: 30s
+    rules:
+      - record: route:http_requests:rate5m
+        expr: |
+          sum by (namespace, route, method) (
+            rate(http_requests_total{job="nimbus-orders-api"}[5m])
+          )
+
+      - record: route:http_requests_errors:rate5m
+        expr: |
+          sum by (namespace, route, method) (
+            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[5m])
+          )
+
+      - record: route:http_requests:error_ratio5m
+        expr: |
+          route:http_requests_errors:rate5m
+            / route:http_requests:rate5m
+
+      - record: route:http_request_duration_seconds:p50
+        expr: |
+          histogram_quantile(0.50,
+            sum by (namespace, route, le) (
+              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+            )
+          )
+
+      - record: route:http_request_duration_seconds:p95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (namespace, route, le) (
+              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+            )
+          )
+
+      - record: route:http_request_duration_seconds:p99
+        expr: |
+          histogram_quantile(0.99,
+            sum by (namespace, route, le) (
+              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+            )
+          )
+
+      - record: job:http_request_duration_seconds:p99
+        expr: |
+          histogram_quantile(0.99,
+            sum by (namespace, le) (
+              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+            )
+          )
+
+  # SLI for the 99.9% availability SLO. "error" = server-side failure (5xx);
+  # 4xx is the caller's fault and does not burn our budget. The four windows are
+  # exactly the ones the multi-window burn-rate alerts pair up (5m/1h fast,
+  # 30m/6h slow). Division by an empty selector yields NaN when there is no
+  # traffic, which keeps the alerts from firing on an idle service.
+  - name: orders-api-slo.rules
+    interval: 30s
+    rules:
+      - record: slo:sli_error:ratio_rate5m
+        expr: |
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[5m])
+          )
+          /
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api"}[5m])
+          )
+
+      - record: slo:sli_error:ratio_rate30m
+        expr: |
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[30m])
+          )
+          /
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api"}[30m])
+          )
+
+      - record: slo:sli_error:ratio_rate1h
+        expr: |
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[1h])
+          )
+          /
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api"}[1h])
+          )
+
+      - record: slo:sli_error:ratio_rate6h
+        expr: |
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[6h])
+          )
+          /
+          sum by (namespace) (
+            rate(http_requests_total{job="nimbus-orders-api"}[6h])
+          )

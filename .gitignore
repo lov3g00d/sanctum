@@ -1,0 +1,36 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+override.tf
+override.tf.json
+.terraform.lock.hcl
+
+# Secrets / credentials (belt and braces; real secrets never live in Git)
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+credentials
+
+# Build / deps
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+
+# SBOM / scan artifacts
+*.sbom.json
+trivy-results.*
+
+# OS / editor
+.DS_Store
+result
+result-*
+.direnv/
