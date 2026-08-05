@@ -52,26 +52,26 @@ detection or accepted.
 | Tampering / EoP | Injection, insecure deserialization | semgrep SAST fail-closed on PR | `cicd/ci.yml` |
 | Spoofing | Weak/absent authn on endpoints | App-layer auth; edge WAF; DAST baseline surfaces gaps | `cicd/cd.yml` (ZAP) |
 | Info disclosure | Verbose errors, missing headers | DAST baseline flags headers/cookies for triage | `cicd/cd.yml` |
-| EoP | SSRF pivoting into the VPC | Default-deny egress NetworkPolicy limits where a pod can reach | `kubernetes/security/networkpolicy.yaml` |
+| EoP | SSRF pivoting into the VPC | Default-deny egress NetworkPolicy limits where a pod can reach | `terraform/modules/platform/policies/cluster/networkpolicy.yaml` |
 
 ### B4 pod to data
 
 | Threat | Vector | Control | Where |
 |--------|--------|---------|-------|
-| Lateral movement | Compromised pod scanning the namespace | Default-deny ingress/egress, explicit allows only to RDS/Redis CIDR | `kubernetes/security/networkpolicy.yaml` |
-| EoP | Pod reading other secrets via API | RBAC scoped by `resourceNames` to the workload's own ConfigMap/Secret | `kubernetes/security/rbac.yaml` |
-| Info disclosure | Credential theft from the pod | IRSA short-lived creds, not node role; secrets from Secrets Manager, never in Git | `charts/podinfo/templates/serviceaccount.yaml`, `kubernetes/README.md` |
-| Spoofing | Stolen SA token used against the API server | Falco alerts on token read by a shell | `security/falco/custom-rules.yaml` |
-| Repudiation | Post-compromise persistence/tampering | Read-only rootfs; Falco alerts on writes to sensitive dirs and shell spawn | PSA restricted + `security/falco/custom-rules.yaml` |
+| Lateral movement | Compromised pod scanning the namespace | Default-deny ingress/egress, explicit allows only to RDS/Redis CIDR | `terraform/modules/platform/policies/cluster/networkpolicy.yaml` |
+| EoP | Pod reading other secrets via API | RBAC scoped by `resourceNames` to the workload's own ConfigMap/Secret | `terraform/modules/platform/policies/cluster/rbac.yaml` |
+| Info disclosure | Credential theft from the pod | IRSA short-lived creds, not node role; secrets from Secrets Manager, never in Git | `charts/podinfo/templates/serviceaccount.yaml`, `terraform/modules/platform/README.md` |
+| Spoofing | Stolen SA token used against the API server | Falco alerts on token read by a shell | `terraform/modules/platform/config/falco-rules.yaml` |
+| Repudiation | Post-compromise persistence/tampering | Read-only rootfs; Falco alerts on writes to sensitive dirs and shell spawn | PSA restricted + `terraform/modules/platform/config/falco-rules.yaml` |
 
 ### B5 supply chain
 
 | Threat | Vector | Control | Where |
 |--------|--------|---------|-------|
-| Tampering | Malicious image pushed to ECR | Kyverno `verify-images` admits only images signed by the CI OIDC identity (Enforce) | `security/kyverno/verify-images.yaml` |
+| Tampering | Malicious image pushed to ECR | Kyverno `verify-images` admits only images signed by the CI OIDC identity (Enforce) | `terraform/modules/platform/policies/kyverno/verify-images.yaml` |
 | Tampering | Vulnerable dependency shipped | trivy fs + image scans fail-closed on HIGH/CRITICAL fixable | `cicd/ci.yml` |
 | Repudiation | "Which images have package X?" unanswerable | syft SBOM per image | `cicd/ci.yml` |
-| Provenance gap | No verifiable bill of materials at admission | SBOM attestation policy (Audit, aspirational; needs `cosign attest` in CI) | `security/kyverno/require-signed-and-sbom.yaml` |
+| Provenance gap | No verifiable bill of materials at admission | SBOM attestation policy (Audit, aspirational; needs `cosign attest` in CI) | `terraform/modules/platform/policies/kyverno/require-signed-and-sbom.yaml` |
 
 ### B6 control plane
 
@@ -79,7 +79,7 @@ detection or accepted.
 |--------|--------|---------|-------|
 | Spoofing | Leaked long-lived AWS keys | GitHub OIDC, no static keys; trust scoped to repo + ref | `cicd/README.md`, `terraform/modules/github-oidc/` |
 | EoP | CI role too broad | Split roles per stage (deploy / tf-plan / tf-apply), least privilege | `cicd/cd.yml`, `terraform/` |
-| Tampering | Manual console change bypassing IaC | Prowler CSPM catches account drift; kube-bench catches cluster drift | `security/cspm/` |
+| Tampering | Manual console change bypassing IaC | Prowler CSPM catches account drift; kube-bench catches cluster drift | `terraform/modules/platform/policies/cspm/` |
 | Repudiation | No record of who changed what | CloudTrail + branch protection + reviewed PRs | scenario, `cicd/README.md` |
 
 ## Controls matrix
@@ -97,18 +97,18 @@ block, and the matrix is honest about which is which.
 | Image CVE (build) | `cicd/ci.yml` (trivy image) | Vulnerable OS/runtime packages | Enforced |
 | SBOM | `cicd/` (syft) | Unanswerable CVE exposure questions | Produced (artifact) |
 | Image signing | `cicd/cd.yml` (cosign keyless) | Tampered artifact | Enforced (signs by digest) |
-| Signature verification | `security/kyverno/verify-images.yaml` | Unsigned/foreign image scheduled | **Enforce** |
-| SBOM attestation | `security/kyverno/require-signed-and-sbom.yaml` | No verifiable BOM at admission | **Audit (aspirational)** |
-| Pod Security Admission | `kubernetes/security/namespace.yaml` | Privileged/root/host-mount pods | Enforced (`restricted`) |
-| Pod hardening policies | `kubernetes/security/kyverno-policies.yaml` | `:latest`, root, writable rootfs, no limits, extra caps | Enforced |
-| Network segmentation | `kubernetes/security/networkpolicy.yaml` | Lateral movement, unexpected egress | Enforced (default-deny) |
-| Least-privilege RBAC | `kubernetes/security/rbac.yaml` | Token enumerating other secrets | Enforced (namespaced, by name) |
+| Signature verification | `terraform/modules/platform/policies/kyverno/verify-images.yaml` | Unsigned/foreign image scheduled | **Enforce** |
+| SBOM attestation | `terraform/modules/platform/policies/kyverno/require-signed-and-sbom.yaml` | No verifiable BOM at admission | **Audit (aspirational)** |
+| Pod Security Admission | `terraform/modules/platform/policies/cluster/namespace.yaml` | Privileged/root/host-mount pods | Enforced (`restricted`) |
+| Pod hardening policies | `terraform/modules/platform/policies/kyverno/pod-security-policies.yaml` | `:latest`, root, writable rootfs, no limits, extra caps | Enforced |
+| Network segmentation | `terraform/modules/platform/policies/cluster/networkpolicy.yaml` | Lateral movement, unexpected egress | Enforced (default-deny) |
+| Least-privilege RBAC | `terraform/modules/platform/policies/cluster/rbac.yaml` | Token enumerating other secrets | Enforced (namespaced, by name) |
 | Workload identity | `charts/podinfo/templates/serviceaccount.yaml` (IRSA) | Node-wide credential blast radius | Enforced |
-| Runtime detection | `security/falco/custom-rules.yaml` | Shell, exfil, tampering, token theft | Detect (alert) |
+| Runtime detection | `terraform/modules/platform/config/falco-rules.yaml` | Shell, exfil, tampering, token theft | Detect (alert) |
 | DAST | `cicd/cd.yml` (ZAP baseline) | Runtime exposure static analysis misses | Report-only |
-| Cluster CIS audit | `security/cspm/kube-bench-job.yaml` | Node/cluster misconfig vs CIS EKS | Audit (on demand) |
-| Continuous cluster posture | `security/cspm/trivy-operator.md` | Running-image CVE, config/RBAC drift | Detect (continuous) |
-| AWS CSPM | `security/cspm/prowler-cronjob.yaml` | Account drift vs CIS AWS Foundations | Audit (weekly) |
+| Cluster CIS audit | `terraform/modules/platform/policies/cspm/kube-bench-job.yaml` | Node/cluster misconfig vs CIS EKS | Audit (on demand) |
+| Continuous cluster posture | `docs/trivy-operator.md` | Running-image CVE, config/RBAC drift | Detect (continuous) |
+| AWS CSPM | `terraform/modules/platform/policies/cspm/prowler-cronjob.yaml` | Account drift vs CIS AWS Foundations | Audit (weekly) |
 | Edge protection | `terraform/modules/cloudflare/` | DDoS, L7 attacks, bots | Enforced |
 
 ## CIS and compliance mapping
@@ -117,16 +117,16 @@ block, and the matrix is honest about which is which.
 
 | CIS area | Repo control |
 |----------|--------------|
-| 4.x worker node config | kube-bench `node` target (`security/cspm/kube-bench-job.yaml`) |
-| 5.1 RBAC and service accounts | `kubernetes/security/rbac.yaml`, scoped SA |
-| 5.2 Pod Security Standards | PSA `restricted` (`kubernetes/security/namespace.yaml`) + Kyverno pod-hardening policies |
-| 5.3 Network policies | `kubernetes/security/networkpolicy.yaml` default-deny |
+| 4.x worker node config | kube-bench `node` target (`terraform/modules/platform/policies/cspm/kube-bench-job.yaml`) |
+| 5.1 RBAC and service accounts | `terraform/modules/platform/policies/cluster/rbac.yaml`, scoped SA |
+| 5.2 Pod Security Standards | PSA `restricted` (`terraform/modules/platform/policies/cluster/namespace.yaml`) + Kyverno pod-hardening policies |
+| 5.3 Network policies | `terraform/modules/platform/policies/cluster/networkpolicy.yaml` default-deny |
 | 5.7 general policies | Kyverno `verify-images`, disallow-latest, resource limits |
 | Continuous scoring | Trivy Operator `ClusterComplianceReport` (`k8s-cis`) |
 
 ### CIS AWS Foundations Benchmark
 
-Covered by Prowler (`security/cspm/prowler-cronjob.yaml`, `--compliance
+Covered by Prowler (`terraform/modules/platform/policies/cspm/prowler-cronjob.yaml`, `--compliance
 cis_3.0_aws`), reinforced by IaC scanning in CI:
 
 | CIS AWS area | Repo control |
@@ -144,7 +144,7 @@ criteria a B2B partner's security review will ask about.
 | Framework | Criterion | Repo evidence |
 |-----------|-----------|---------------|
 | SOC2 | CC6 logical access | RBAC, IRSA, OIDC, NetworkPolicy, PSA |
-| SOC2 | CC7 system operations / monitoring | Falco, Prowler, kube-bench, `monitoring/`, GuardDuty |
+| SOC2 | CC7 system operations / monitoring | Falco, Prowler, kube-bench, the kube-prometheus-stack, GuardDuty |
 | SOC2 | CC8 change management | Branch protection, reviewed PRs, signed images, IaC |
 | PCI DSS | Req 1/2 network and config | NetworkPolicy, security groups, PSA `restricted` |
 | PCI DSS | Req 6 secure SDLC | SAST/SCA/secret/IaC gates, signing, verification |
@@ -163,7 +163,7 @@ a malicious image, and leaked cloud credentials. It assumes the detection layer
 
 ### 1. Detect and triage
 
-- **Signal sources.** Falco rule fires (shell in container, token read, off-cluster egress), GuardDuty finding, Prowler/kube-bench drift, or an SLO/error alert from `monitoring/`.
+- **Signal sources.** Falco rule fires (shell in container, token read, off-cluster egress), GuardDuty finding, Prowler/kube-bench drift, or an SLO/error alert from the kube-prometheus-stack.
 - **Triage.** Confirm scope from the Falco/GuardDuty output fields: which namespace, pod, image, principal. Decide compromise class (pod, image, or credential) because containment differs.
 
 ### 2. Contain

@@ -3,8 +3,8 @@
 # module so the two stay in lockstep. v21 wires the controller via EKS Pod Identity
 # rather than IRSA, so this path needs the eks-pod-identity-agent addon on the cluster.
 #
-# The EC2NodeClass and NodePool custom resources are day-2 Kubernetes config and live in
-# kubernetes/, not here. This module only provisions the AWS-side identity and the
+# The EC2NodeClass and NodePool custom resources are day-2 Kubernetes tuning and are not
+# delivered by this module. This module only provisions the AWS-side identity and the
 # controller install.
 module "karpenter" {
   count   = var.enable_karpenter ? 1 : 0

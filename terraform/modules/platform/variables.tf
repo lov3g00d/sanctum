@@ -98,6 +98,24 @@ variable "enable_kyverno" {
   default     = true
 }
 
+variable "enable_kyverno_policies" {
+  description = "Deliver the Kyverno ClusterPolicies (supply-chain + pod-hardening). Requires enable_kyverno."
+  type        = bool
+  default     = true
+}
+
+variable "enable_cspm" {
+  description = "Deliver the CSPM scanners (kube-bench Job, Prowler CronJob)."
+  type        = bool
+  default     = true
+}
+
+variable "enable_cluster_posture" {
+  description = "Deliver the nimbus app-namespace posture (namespace, NetworkPolicies, RBAC, quota, LimitRange)."
+  type        = bool
+  default     = true
+}
+
 variable "enable_loki" {
   description = "Install Loki as the logs backend."
   type        = bool

@@ -2,7 +2,7 @@
 # every node and alerts on suspicious behaviour that admission control cannot catch (a
 # shell in a container, unexpected outbound connections, writes to sensitive paths). The
 # modern_ebpf driver avoids a kernel-module build and works on current EKS AMIs. Custom
-# detection rules are maintained in the repo under security/falco and layered on top.
+# detection rules are delivered from config/falco-rules.yaml and layered on top.
 resource "helm_release" "falco" {
   count      = var.enable_falco ? 1 : 0
   name       = "falco"
@@ -30,6 +30,12 @@ resource "helm_release" "falco" {
         kubernetes = {
           enabled = true
         }
+      }
+
+      # Nimbus rules loaded alongside Falco's default ruleset. The map key becomes the
+      # filename mounted under /etc/falco/rules.d; kept as a reviewable file under config/.
+      customRules = {
+        "nimbus-rules.yaml" = file("${path.module}/config/falco-rules.yaml")
       }
     })
   ]

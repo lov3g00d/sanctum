@@ -30,7 +30,8 @@ kubectl get vulnerabilityreports -n nimbus -o wide
 kubectl get clustercompliancereport cis -o yaml
 ```
 
-The `ClusterComplianceReport` overlaps kube-bench (`kube-bench-job.yaml`): both
+The `ClusterComplianceReport` overlaps kube-bench
+(`terraform/modules/platform/policies/cspm/kube-bench-job.yaml`): both
 score CIS Kubernetes. kube-bench is a point-in-time node audit run on demand;
 Trivy Operator keeps a continuously-updated cluster-wide compliance object. Run
 both, they answer the question at different cadences.
@@ -66,5 +67,6 @@ compliance:
 Pin `--version` to a specific chart release and bump it as a reviewed change,
 the same discipline applied to the kube-bench image tag. Route
 `HIGH`/`CRITICAL` `VulnerabilityReport` counts and the `ClusterComplianceReport`
-score into the Prometheus stack in `monitoring/` (the operator exposes metrics)
+score into the kube-prometheus-stack the platform installs (the operator exposes
+metrics)
 so a workload drifting out of compliance pages the same way an SLO breach does.

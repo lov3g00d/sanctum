@@ -91,7 +91,7 @@ you reach for when the workload shape fits, not as something wired up here.
 - Supply chain: SBOM (syft) + sign (cosign) + verify at admission (Kyverno). SLSA provenance.
 - OIDC over long-lived keys: CI assumes a role via short-lived tokens, nothing to leak. You have done exactly this at Platonic.
 
-**Monitoring** (see `monitoring/`)
+**Monitoring** (see `terraform/modules/platform/config/` and `charts/podinfo/`)
 - Four golden signals: latency, traffic, errors, saturation. RED for services, USE for resources.
 - SLI/SLO/error budget: the SLO sets how much unreliability is acceptable; the error budget is what you spend on releases; multi-window multi-burn-rate alerts page only when the budget is genuinely at risk.
 - Alert on symptoms (user-visible), not causes. Reduce alert fatigue or you train people to ignore pages.

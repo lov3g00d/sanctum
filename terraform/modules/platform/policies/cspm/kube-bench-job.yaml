@@ -5,10 +5,9 @@
 # the repo's Kyverno guardrails (non-root, readonly-rootfs, drop-all-caps).
 #
 # It runs in kube-system deliberately: that namespace is excluded from the
-# ClusterPolicies in kubernetes/security/kyverno-policies.yaml and is not
+# ClusterPolicies in policies/kyverno/pod-security-policies.yaml and is not
 # PSA-restricted, so the job schedules with no policy exemption. A dedicated
-# namespace would need those cluster policies amended to exempt it, which is out
-# of scope for this track (kubernetes/ is not modified here).
+# namespace would need those cluster policies amended to exempt it.
 #
 # EKS control-plane checks are managed by AWS and not inspectable, so most
 # controlplane/managedservices items report as manual. Node and policy checks

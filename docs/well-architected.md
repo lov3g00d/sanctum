@@ -10,9 +10,9 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 
 "Can you run, observe, and improve the system safely?"
 
-- Everything is code: infra in `terraform/`, app config in `kubernetes/`, pipelines in `cicd/`. No console clicks that drift from source of truth.
+- Everything is code: infra in `terraform/`, app config in `charts/podinfo/`, pipelines in `cicd/`. No console clicks that drift from source of truth.
 - Small, frequent, reversible changes: CI gates + `kubectl rollout` with automatic halt on failed readiness, `rollout undo` for rollback.
-- Observability before features: `monitoring/` ships dashboards, SLOs, and runbook links from day one.
+- Observability before features: the platform's kube-prometheus-stack ships dashboards, SLOs, and runbook links from day one.
 - Game days / failure injection belong here (chaos testing pods and AZ loss).
 
 ## 2. Security
@@ -20,7 +20,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 "Least privilege, everywhere, verifiable."
 
 - Identity: no long-lived AWS keys. CI authenticates with GitHub OIDC (`terraform/modules/github-oidc/`), workloads use IRSA per service account. This is the single highest-leverage AWS security control.
-- Network: default-deny NetworkPolicy in `kubernetes/security/`, private subnets for compute and data, security groups referencing other SGs rather than CIDRs.
+- Network: default-deny NetworkPolicy in `terraform/modules/platform/policies/cluster/`, private subnets for compute and data, security groups referencing other SGs rather than CIDRs.
 - Data: KMS encryption at rest on RDS/S3/EKS secrets, TLS in transit, secrets in Secrets Manager/SSM, never in Git (`.gitignore` + gitleaks).
 - Edge: Cloudflare WAF, rate limiting, and authenticated origin pulls so the AWS origin only trusts Cloudflare.
 - The whole `cicd/` security-gate chain is this pillar shifted left. See [`devsecops-shift-left.md`](devsecops-shift-left.md).
@@ -31,7 +31,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 
 - Multi-AZ everywhere: subnets across 3 AZs, RDS Multi-AZ standby, pods spread with `topologySpreadConstraints`.
 - Self-healing: liveness/readiness probes, HPA, Karpenter node replacement, PodDisruptionBudgets so voluntary disruptions never take the service below quorum.
-- Defined limits: SLOs and error budgets in `monitoring/`, backup/restore with stated RTO/RPO in [`resilience-auto-recovery.md`](resilience-auto-recovery.md).
+- Defined limits: SLOs and error budgets in the platform's kube-prometheus-stack, backup/restore with stated RTO/RPO in [`resilience-auto-recovery.md`](resilience-auto-recovery.md).
 - Quotas and limits are a reliability control too (`ResourceQuota`/`LimitRange`), they stop one workload starving the cluster.
 
 ## 4. Performance Efficiency
@@ -41,7 +41,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 - Right-sizing from real utilization: requests and limits set from observed usage, not guesses, so pods are packed efficiently and nodes are not over-provisioned. Paying for idle headroom is the anti-pattern this avoids.
 - Caching at two layers: Cloudflare CDN at the edge, ElastiCache Redis for hot data.
 - Autoscaling on real signals: HPA on CPU and memory (and custom metrics in reality), Karpenter provisioning right-sized nodes including spot.
-- Right-sizing is driven by the saturation metrics in `monitoring/`, not guesses.
+- Right-sizing is driven by the saturation metrics in the kube-prometheus-stack, not guesses.
 
 ## 5. Cost Optimization
 

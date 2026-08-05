@@ -13,8 +13,9 @@
 # sharpens the output and the app-specific allowlists.
 #
 # These detect what the preventive controls could not stop. Prevention lives in
-# kubernetes/security/ (PSA restricted, read-only rootfs, default-deny
-# NetworkPolicy, drop-all-caps); Falco is the residual-risk layer.
+# the platform module's cluster posture (policies/cluster: PSA restricted,
+# default-deny NetworkPolicy) and Kyverno policies (policies/kyverno: read-only
+# rootfs, drop-all-caps); Falco is the residual-risk layer.
 
 - required_engine_version: 0.37.0
 

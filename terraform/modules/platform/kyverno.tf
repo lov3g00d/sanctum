@@ -1,7 +1,7 @@
 # Kyverno is the admission-control half of the DevSecOps story: it validates, mutates and
 # generates resources at deploy time (block latest tags, require resource limits, enforce
-# signed images). The policies themselves are version-controlled under kubernetes/security
-# and security/kyverno; this release only installs the engine.
+# signed images). This release installs only the engine; the ClusterPolicies it runs are
+# delivered from policies/kyverno by kyverno-policies.tf.
 resource "helm_release" "kyverno" {
   count      = var.enable_kyverno ? 1 : 0
   name       = "kyverno"

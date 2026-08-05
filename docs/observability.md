@@ -2,12 +2,16 @@
 
 Observability for Nimbus: how we know the platform is healthy, how we find out
 first when it is not, and how we decide whether a problem is worth waking someone
-for. The config in this directory is written as plain Prometheus, Alertmanager
-and Grafana files so the intent is reviewable in one place. In production it is
-deployed as [`kube-prometheus-stack`](https://github.com/prometheus-community/helm-charts)
-via Helm/ArgoCD, where the Prometheus Operator renders the same scrape jobs from
+for. The config is written as plain Prometheus, Alertmanager and Grafana files
+under [`terraform/modules/platform/config/`](../terraform/modules/platform/config)
+so the intent is reviewable in one place. In production it is delivered by the
+Terraform platform module as
+[`kube-prometheus-stack`](https://github.com/prometheus-community/helm-charts)
+(Helm), where the Prometheus Operator renders the same scrape jobs from
 `ServiceMonitor`/`PodMonitor` objects and the same rules from `PrometheusRule`
-objects. Everything runs in the `monitoring` namespace.
+objects. The global alert rules, Alertmanager routing and the Loki/Tempo Grafana
+datasources are folded into the chart values from those files. Everything runs in
+the `monitoring` namespace.
 
 ## The four golden signals
 
@@ -123,17 +127,17 @@ clears quickly once the burn stops). Two burn rates give sensitivity without
 noise: a fast catastrophic burn pages immediately, a slow grind opens a ticket
 before the budget is gone. podinfo's burn-rate and symptom thresholds and its
 SLI recording rules ship with the app (`charts/podinfo`, as a `PrometheusRule`);
-what remains in `prometheus/rules/alerts.yml` is the global Kube/Node/RDS/platform
+what remains in `config/prometheus-rules.yaml` is the global Kube/Node/RDS/platform
 set.
 
 ## Layout
 
 ```
-prometheus/prometheus.yml            scrape jobs, external labels, rule + AM wiring
-prometheus/rules/alerts.yml          global Kube/Node/RDS/platform alerts
-alertmanager/alertmanager.yml        routing (page->PagerDuty, ticket->Slack), inhibitions
-grafana/provisioning/datasources.yml Prometheus + Loki + Tempo (with trace correlation)
-grafana/provisioning/dashboards.yml  file-provider for sidecar-loaded dashboards
+terraform/modules/platform/config/
+  prometheus-rules.yaml       global Kube/Node/RDS/platform alerts
+  alertmanager.yaml           routing (page->PagerDuty, ticket->Slack), inhibitions
+  grafana-datasources.yaml    Loki + Tempo (with trace correlation); Prometheus
+                              is auto-provisioned by the chart with uid "prometheus"
 ```
 
 podinfo's own observability wiring, its RED + SLO dashboards, its RED/SLI

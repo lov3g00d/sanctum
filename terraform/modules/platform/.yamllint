@@ -2,7 +2,8 @@
 extends: default
 
 rules:
-  # PromQL expressions and long relabel regexes routinely exceed 80 cols.
+  # PromQL expressions, long relabel regexes and Falco conditions routinely
+  # exceed 80 cols; keep them readable in one line rather than folding.
   line-length: disable
   document-start: disable
   comments-indentation: disable

@@ -3,7 +3,7 @@
 # workload scaling is meant to run on Karpenter: it provisions right-sized nodes from
 # pending pods in seconds and consolidates them when idle, which is cheaper and faster
 # than a fixed ASG per instance type. Karpenter's NodePool/EC2NodeClass are Kubernetes
-# resources, so they live in kubernetes/, not here. This module only exposes the OIDC
+# resources delivered as day-2 tuning, not here. This module only exposes the OIDC
 # provider and node security group Karpenter needs.
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"

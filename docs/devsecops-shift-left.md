@@ -56,7 +56,8 @@ your code.
 
 ## Stage 3 - deploy-time (policy as code)
 
-`kubernetes/security/`.
+`terraform/modules/platform/policies/` (cluster posture and Kyverno policies,
+delivered by the platform module).
 
 - **Pod Security Admission** set to `restricted` on the namespace: the API server rejects privileged pods, host mounts, and root containers at admission.
 - **Kyverno ClusterPolicies**: disallow `:latest`, require non-root, require read-only rootfs, require resource limits, require dropped capabilities. Policy as code, versioned and reviewed like everything else.

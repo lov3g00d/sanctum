@@ -86,9 +86,9 @@ Details and the numbers (RTO/RPO, health-check tuning) live in
 |---------------|--------------------|
 | AWS + Well-Architected | `terraform/`, [`well-architected.md`](well-architected.md) |
 | Terraform IaC | `terraform/` (modules + `live/` Terragrunt + remote state) |
-| Kubernetes + Docker | `kubernetes/`, `docker/` |
+| Kubernetes + Docker | `charts/podinfo/`, `terraform/modules/platform/policies/`, `docker/` |
 | Cloudflare | `terraform/modules/cloudflare/` |
-| Monitoring / Grafana | `monitoring/` |
+| Monitoring / Grafana | `terraform/modules/platform/config/`, `charts/podinfo/` |
 | Linux + Bash | `scripts/` |
 | Nginx / container workload | `docker/nginx/`, `docker/podinfo.Dockerfile` |
 | Networking (TCP/IP, DNS, HTTP) | [`networking-fundamentals.md`](networking-fundamentals.md) |

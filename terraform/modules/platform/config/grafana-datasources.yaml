@@ -1,19 +1,10 @@
 ---
-# Datasource provisioning. Fixed uids so the committed dashboard JSON can
-# reference them directly rather than through a per-instance import variable.
-apiVersion: 1
-
+# Extra Grafana datasources merged into the kube-prometheus-stack via
+# grafana.additionalDataSources. Prometheus is auto-provisioned by the chart with
+# uid "prometheus" (grafana.sidecar.datasources), so it is intentionally not
+# redefined here; the Tempo pivots below reference that uid. Fixed uids let the
+# committed dashboard JSON reference these datasources directly.
 datasources:
-  - name: Prometheus
-    type: prometheus
-    uid: prometheus
-    access: proxy
-    url: http://prometheus.monitoring.svc.cluster.local:9090
-    isDefault: true
-    jsonData:
-      httpMethod: POST
-      timeInterval: 15s
-
   - name: Loki
     type: loki
     uid: loki

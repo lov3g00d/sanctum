@@ -39,7 +39,7 @@ inhibit_rules:
 
   # A dead node produces its own NotReady page-path signal; suppress the pod
   # churn it causes on that node. Requires the pod alerts to carry a node label
-  # (joined via kube_pod_info in alerts.yml).
+  # (joined via kube_pod_info in prometheus-rules.yaml).
   - source_matchers:
       - alertname = NodeNotReady
     target_matchers:

@@ -17,13 +17,10 @@ secrets. The value is in the shape of the code and the reasoning in `docs/`.
 
 | Path | What it holds |
 |------|---------------|
-| `terraform/modules/` | Reusable modules: `vpc`, `eks`, `rds`, `cloudflare`, `github-oidc`, and `platform` (the Helm addon layer) |
+| `terraform/modules/` | Reusable modules: `vpc`, `eks`, `rds`, `cloudflare`, `github-oidc`, and `platform` (the Helm addon layer, which also delivers all cluster-wide config: monitoring rules, Kyverno/Falco policies, CSPM scanners, and the app-namespace posture) |
 | `terraform/live/` | Terragrunt env layer: `dev`/`prod` units wiring the modules with S3 + DynamoDB remote state and `dependency`-passed outputs |
 | `charts/podinfo/` | Helm chart for the podinfo app: Rollout/Deployment, service, ingress, HPA/PDB, network policies, ServiceMonitor, PrometheusRule, SLO dashboards |
-| `kubernetes/` | Cluster + namespace hardening: Pod Security, default-deny NetworkPolicy, RBAC, Kyverno, quotas |
-| `gitops/` | ArgoCD `AppProject` + `ApplicationSet` delivering the podinfo chart per environment |
-| `security/` | Admission (Kyverno `verifyImages`/cosign), runtime (Falco rules), and posture (kube-bench, Prowler, Trivy) |
-| `monitoring/` | Prometheus rules, Grafana dashboards, Alertmanager, multi-burn-rate SLOs |
+| `gitops/` | ArgoCD `AppProject` + `ApplicationSet` delivering only the podinfo workload chart per environment |
 | `docker/` | Multistage Dockerfile that builds the podinfo workload image from pinned source, and a hardened Nginx reverse proxy |
 | `cicd/` | GitHub Actions with shift-left security gates over keyless OIDC |
 | `scripts/` | Hardened Bash: health checks, backups, log rotation, EC2 bootstrap |
@@ -44,11 +41,15 @@ root module.
   infrastructure via `helm_release` with per-chart IRSA: AWS Load Balancer Controller,
   cert-manager, external-secrets, external-dns, metrics-server, Karpenter,
   kube-prometheus-stack, ArgoCD, Argo Rollouts, Falco, and Kyverno. Each addon is
-  toggle-gated.
+  toggle-gated. The same module delivers the cluster-wide config those engines run:
+  global Prometheus alert rules, Alertmanager routing and Grafana datasources (chart
+  values), and the Kyverno ClusterPolicies, Falco rules, CSPM scanners and nimbus
+  namespace posture (`kubectl_manifest` from `config/` and `policies/`).
 - **Day 2 (application delivery):** `gitops/` holds the ArgoCD `ApplicationSet` (a list
   generator over environments, the modern replacement for hand-written app-of-apps)
-  syncing the `charts/podinfo` Helm chart, whose SLO-gated Argo Rollout canary aborts
-  on the Prometheus error budget.
+  syncing only the `charts/podinfo` workload chart, whose SLO-gated Argo Rollout canary
+  aborts on the Prometheus error budget. Cluster config is Terraform's job, not
+  ArgoCD's.
 
 ## Security across the lifecycle
 
@@ -81,4 +82,6 @@ nix develop   # terraform, terragrunt, kubectl, kustomize, hadolint, trivy, cosi
 - `docs/well-architected.md`, `resilience-auto-recovery.md`, `networking-fundamentals.md` - engineering notes
 - `docs/devsecops-shift-left.md`, `security-architecture.md` - the security model
 - `docs/gitops.md` - the GitOps and progressive-delivery design
+- `docs/observability.md` - the four golden signals, RED/USE, signal correlation, SLOs
+- `docs/trivy-operator.md` - continuous in-cluster posture (running-image CVE, config/RBAC drift)
 - `docs/interview-cheatsheet.md` - personal notes, kept out of the platform narrative

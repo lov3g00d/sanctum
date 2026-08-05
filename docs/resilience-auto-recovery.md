@@ -84,7 +84,7 @@ Recovery is not only about restarting things, it is about failing without spread
 
 - **Rolling update** (default): readiness-gated, so a broken version never receives traffic and the rollout halts itself.
 - **Blue-green**: full parallel environment, flip traffic, instant rollback by flipping back.
-- **Canary**: shift a small traffic slice to the new version, watch the SLO burn rate in `monitoring/`, promote or roll back automatically. Argo Rollouts / Flagger drive this.
+- **Canary**: shift a small traffic slice to the new version, watch the SLO burn rate in the kube-prometheus-stack, promote or roll back automatically. Argo Rollouts / Flagger drive this.
 - **Automated rollback**: tie the deploy to the error-budget burn alert, a spike auto-triggers `kubectl rollout undo`.
 
 ## Verifying resilience (do not assume it)

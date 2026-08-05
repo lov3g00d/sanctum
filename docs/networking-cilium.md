@@ -24,7 +24,7 @@ the socket and tc layers. That gives us three things the default stack cannot:
   iptables chain, which matters once a cluster has many Services.
 - **L3-L7 policy.** CiliumNetworkPolicy filters on HTTP method and path, DNS names,
   and Kubernetes identity, not just IP and port. The example in
-  `security/cilium/podinfo-l7.yaml` allows `GET /metrics` from monitoring while
+  `charts/podinfo/templates/ciliumnetworkpolicy.yaml` allows `GET /metrics` from monitoring while
   denying every other verb and path, which a Kubernetes NetworkPolicy cannot do.
 - **Hubble observability.** Because the dataplane already parses flows, Hubble
   exports them as a live service map and as Prometheus metrics with no sidecars.
@@ -114,9 +114,9 @@ alerts, for example alerting on a rising `hubble_drop_total` for the nimbus name
 ## How CiliumNetworkPolicy relates to the existing NetworkPolicies
 
 The repo already ships Kubernetes NetworkPolicies in
-`kubernetes/security/networkpolicy.yaml`: default-deny, allow DNS egress, allow ingress to
+`terraform/modules/platform/policies/cluster/networkpolicy.yaml`: default-deny, allow DNS egress, allow ingress to
 podinfo, allow egress to the data stores. Cilium enforces those natively; adopting it does
-not orphan them. `security/cilium/podinfo-l7.yaml` layers on top rather than replacing them.
+not orphan them. `charts/podinfo/templates/ciliumnetworkpolicy.yaml` layers on top rather than replacing them.
 
 The division of labour is by protocol layer. The Kubernetes policies handle L3/L4: which
 CIDRs and namespaces may reach podinfo on 9898, which ports egress may use. The
