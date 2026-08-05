@@ -10,7 +10,7 @@ reciting disconnected facts, and every file here is a concrete thing you can poi
 - B2B, so traffic is bursty and integration-driven: partners call our REST APIs,
   we call theirs, and a bad deploy or outage is visible to paying customers immediately.
 - Launching in 2025, so the design favours things that are cheap to run small and
-  scale without re-architecture (managed data stores, autoscaling, serverless for spiky work).
+  scale without re-architecture (managed data stores, autoscaling, spot capacity).
 - Security is a first-class requirement (this is a DevSecOps role, not just DevOps):
   controls live in the pipeline and the platform, not in a wiki nobody reads.
 
@@ -22,8 +22,7 @@ reciting disconnected facts, and every file here is a concrete thing you can poi
 | Primary region | `eu-central-1` (Frankfurt) |
 | DR region | `eu-west-1` (Ireland) |
 | Environments | `dev`, `prod` |
-| Core service (containers) | `nimbus-orders-api` (Node.js / Express) |
-| Ledger service (serverless) | `nimbus-ledger` (Python / FastAPI on Lambda) |
+| Workload | `podinfo` (upstream `stefanprodan/podinfo`, Go, port 9898) |
 | Public hostname | `api.nimbus.example.com` |
 | Kubernetes namespace | `nimbus` |
 | Observability namespace | `monitoring` |
@@ -46,10 +45,10 @@ reciting disconnected facts, and every file here is a concrete thing you can poi
              ┌─────────────────────────────┐
              │  AWS  eu-central-1          │
              │                             │
-   public →  │   ALB (WAF assoc.)          │   API Gateway ──► Lambda
-   subnets   │        │                    │   (nimbus-ledger, serverless)
+   public →  │   ALB (WAF assoc.)          │
+   subnets   │        │                    │
              │        ▼                    │
-   private → │   EKS  (nimbus-orders-api)  │
+   private → │   EKS  (podinfo)            │
    subnets   │   HPA + Karpenter, IRSA     │
              │        │                    │
    data    → │   RDS PostgreSQL (Multi-AZ) │   ElastiCache Redis   S3
@@ -57,18 +56,15 @@ reciting disconnected facts, and every file here is a concrete thing you can poi
              └─────────────────────────────┘
 ```
 
-Two compute planes on purpose:
+EKS is the compute plane. `podinfo` (a public cloud-native test app) stands in for
+the core service so the platform can be exercised end to end without shipping
+bespoke app code. Kubernetes gives us rolling deploys, self-healing (failed
+pods/nodes are replaced), horizontal autoscaling, and a portable place to enforce
+network policy and pod security.
 
-- **EKS** runs the always-on core API. Kubernetes gives us rolling deploys,
-  self-healing (failed pods/nodes are replaced), horizontal autoscaling, and a
-  portable place to enforce network policy and pod security.
-- **Serverless (Lambda + API Gateway)** runs spiky, event-driven, or low-traffic
-  endpoints where paying for idle EKS capacity makes no sense. This is the
-  Well-Architected "right tool for the job" split the job description calls out.
-
-Cloudflare sits in front of both. It absorbs DDoS and bad traffic before it costs
-us anything, terminates TLS at the edge, and gives us a WAF and rate limiting that
-protect endpoints regardless of which AWS compute is behind them.
+Cloudflare sits in front. It absorbs DDoS and bad traffic before it costs us
+anything, terminates TLS at the edge, and gives us a WAF and rate limiting that
+protect the origin regardless of what runs behind it.
 
 ## How resilience / auto-recovery is achieved (the job's headline ask)
 
@@ -89,13 +85,12 @@ Details and the numbers (RTO/RPO, health-check tuning) live in
 | Qualification | Where in this repo |
 |---------------|--------------------|
 | AWS + Well-Architected | `terraform/`, [`well-architected.md`](well-architected.md) |
-| Serverless | `terraform/modules/serverless-api/`, `app/ledger-py/` |
-| Terraform IaC | `terraform/` (modules + envs + remote state) |
+| Terraform IaC | `terraform/` (modules + `live/` Terragrunt + remote state) |
 | Kubernetes + Docker | `kubernetes/`, `docker/` |
 | Cloudflare | `terraform/modules/cloudflare/` |
 | Monitoring / Grafana | `monitoring/` |
 | Linux + Bash | `scripts/` |
-| Python / Node / Nginx | `app/`, `docker/nginx/` |
+| Nginx / container workload | `docker/nginx/`, `docker/podinfo.Dockerfile` |
 | Networking (TCP/IP, DNS, HTTP) | [`networking-fundamentals.md`](networking-fundamentals.md) |
 | Security in the SDLC | `cicd/`, [`devsecops-shift-left.md`](devsecops-shift-left.md) |
 | Root-cause / troubleshooting | [`interview-cheatsheet.md`](interview-cheatsheet.md) |

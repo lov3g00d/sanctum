@@ -2,13 +2,13 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: nimbus-orders-api
+  name: podinfo
   namespace: nimbus
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: nimbus-orders-api
+    name: podinfo
   minReplicas: 3
   maxReplicas: 10
   metrics:

@@ -49,7 +49,6 @@ package, or touches cloud, so nothing is granted beyond reading the code.
 | iac | trivy config | IaC misconfig, second engine over the same HCL | HIGH/CRITICAL |
 | build + scan | trivy image | OS/library CVEs in the built image | HIGH/CRITICAL, fixable |
 | build + scan | syft (SBOM) | - (produces the SPDX inventory) | never (artifact only) |
-| unit tests | node / pytest | Broken application logic | Test failure |
 
 `ignore-unfixed: true` on the trivy vuln/image scans is deliberate: block on
 CVEs a base-image or dependency bump can actually fix, and do not wedge the
@@ -59,10 +58,11 @@ exemption.
 The image scan runs against a locally-built image that is **loaded, not
 pushed**. A PR proves the image is clean before any registry ever sees it.
 
-The two container services (`nimbus-orders-api`, `nimbus-ledger`) share the
-build+scan+SBOM steps through a matrix. The unit-test jobs stay separate:
-Node and Python setups differ enough that forcing them into one matrix would
-be noise, not reuse.
+The deployable workload is upstream `podinfo` (a public, reproducible image
+that stands in for the core service), so the build+scan+SBOM steps run once for
+a single image rather than across a service matrix. There is no bespoke app
+source in the repo, so there is no unit-test job: the pipeline verifies the
+image, not application logic.
 
 ### `cd.yml` (main / tags)
 
@@ -73,7 +73,7 @@ OIDC token.
 
 | Stage | What it does | Gate |
 |-------|-------------|------|
-| build-push | Build both images, push to ECR tagged by git SHA | trivy already gated on PR |
+| build-push | Build the image, push to ECR tagged by git SHA | trivy already gated on PR |
 | build-push | `cosign sign` keyless, by digest | supply-chain provenance |
 | deploy-dev | `kustomize build overlays/dev \| kubectl apply`, wait for rollout | rollout status |
 | dast-dev | OWASP ZAP baseline against the dev endpoint | report-only |
@@ -92,21 +92,20 @@ it could be edited in the same PR it is meant to guard.
 ReplicaSet never becomes Ready, but it does not revert. To roll back:
 
 ```
-kubectl -n nimbus rollout undo deployment/nimbus-orders-api
-kubectl -n nimbus rollout undo deployment/nimbus-ledger
+kubectl -n nimbus rollout undo deployment/podinfo
 ```
 
-Under ArgoCD: `argocd app rollback nimbus-prod <history-id>`, or enable
+Under ArgoCD: `argocd app rollback podinfo-prod <history-id>`, or enable
 self-heal so live state is continuously reconciled back to the pinned SHA.
 
 ### `terraform.yml` (terraform PRs / merges)
 
-Path-filtered to `terraform/**` so it only runs when infra changes. Matrix over
-`environments/{dev,prod}`.
+Path-filtered to `terraform/**` so it only runs when infra changes. Matrix over the
+Terragrunt env layer `live/{dev,prod}`, driven with `terragrunt run --all`.
 
 | Event | Steps | Gate |
 |-------|-------|------|
-| pull_request | fmt, init, validate, checkov, `plan` posted as a PR comment | checkov hard-fails; plan is reviewed |
+| pull_request | hcl fmt, hcl validate, checkov, `run --all plan` posted as a PR comment | checkov hard-fails; plan is reviewed |
 | push to main | init, `apply -auto-approve` | Environment approval before apply |
 
 `plan` runs under a **read-only** OIDC role (`AWS_TF_PLAN_ROLE_ARN`) and posts

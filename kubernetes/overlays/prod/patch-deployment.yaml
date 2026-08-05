@@ -2,13 +2,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nimbus-orders-api
+  name: podinfo
   namespace: nimbus
 spec:
   template:
     spec:
       containers:
-        - name: orders-api
+        - name: podinfo
           resources:
             requests:
               cpu: 250m

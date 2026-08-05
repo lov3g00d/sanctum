@@ -1,9 +1,9 @@
 {
-  "uid": "nimbus-orders-api-red",
-  "title": "Nimbus orders-api RED",
+  "uid": "nimbus-podinfo-red",
+  "title": "Nimbus podinfo RED",
   "tags": [
     "nimbus",
-    "orders-api",
+    "podinfo",
     "red"
   ],
   "timezone": "browser",
@@ -59,15 +59,15 @@
         }
       },
       {
-        "name": "route",
+        "name": "path",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(http_requests_total{namespace=\"$namespace\"}, route)",
+        "definition": "label_values(http_request_duration_seconds_count{namespace=\"$namespace\"}, path)",
         "query": {
-          "query": "label_values(http_requests_total{namespace=\"$namespace\"}, route)",
+          "query": "label_values(http_request_duration_seconds_count{namespace=\"$namespace\"}, path)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -90,7 +90,7 @@
       "id": 1,
       "type": "timeseries",
       "title": "Request rate (traffic)",
-      "description": "RED: rate. Per-route request rate from the recording rule.",
+      "description": "RED: rate. Per-path request rate from the recording rule.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -138,8 +138,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (route) (route:http_requests:rate5m{namespace=\"$namespace\", route=~\"$route\"})",
-          "legendFormat": "{{route}}",
+          "expr": "sum by (path) (path:http_requests:rate5m{namespace=\"$namespace\", path=~\"$path\"})",
+          "legendFormat": "{{path}}",
           "format": "time_series",
           "instant": false,
           "range": true,
@@ -215,7 +215,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * sum(route:http_requests_errors:rate5m{namespace=\"$namespace\", route=~\"$route\"}) / sum(route:http_requests:rate5m{namespace=\"$namespace\", route=~\"$route\"})",
+          "expr": "100 * sum(path:http_requests_errors:rate5m{namespace=\"$namespace\", path=~\"$path\"}) / sum(path:http_requests:rate5m{namespace=\"$namespace\", path=~\"$path\"})",
           "legendFormat": "5xx %",
           "format": "time_series",
           "instant": false,
@@ -228,7 +228,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "Latency p50 / p95 / p99 (duration)",
-      "description": "RED: duration. Quantiles over the selected routes' buckets.",
+      "description": "RED: duration. Quantiles over the selected paths' buckets.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -276,7 +276,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"nimbus-orders-api\", namespace=\"$namespace\", route=~\"$route\"}[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"podinfo\", namespace=\"$namespace\", path=~\"$path\"}[5m])))",
           "legendFormat": "p50",
           "format": "time_series",
           "instant": false,
@@ -289,7 +289,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"nimbus-orders-api\", namespace=\"$namespace\", route=~\"$route\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"podinfo\", namespace=\"$namespace\", path=~\"$path\"}[5m])))",
           "legendFormat": "p95",
           "format": "time_series",
           "instant": false,
@@ -302,7 +302,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"nimbus-orders-api\", namespace=\"$namespace\", route=~\"$route\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"podinfo\", namespace=\"$namespace\", path=~\"$path\"}[5m])))",
           "legendFormat": "p99",
           "format": "time_series",
           "instant": false,
@@ -363,7 +363,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(http_request_duration_seconds_sum{job=\"nimbus-orders-api\", namespace=\"$namespace\", route=~\"$route\"}[5m]))",
+          "expr": "sum(rate(http_request_duration_seconds_sum{job=\"podinfo\", namespace=\"$namespace\", path=~\"$path\"}[5m]))",
           "legendFormat": "concurrent",
           "format": "time_series",
           "instant": false,
@@ -375,7 +375,7 @@
     {
       "id": 5,
       "type": "table",
-      "title": "By route",
+      "title": "By path",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -460,7 +460,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (route) (route:http_requests:rate5m{namespace=\"$namespace\", route=~\"$route\"})",
+          "expr": "sum by (path) (path:http_requests:rate5m{namespace=\"$namespace\", path=~\"$path\"})",
           "legendFormat": "",
           "format": "table",
           "instant": true,
@@ -473,7 +473,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * sum by (route) (route:http_requests_errors:rate5m{namespace=\"$namespace\", route=~\"$route\"}) / sum by (route) (route:http_requests:rate5m{namespace=\"$namespace\", route=~\"$route\"})",
+          "expr": "100 * sum by (path) (path:http_requests_errors:rate5m{namespace=\"$namespace\", path=~\"$path\"}) / sum by (path) (path:http_requests:rate5m{namespace=\"$namespace\", path=~\"$path\"})",
           "legendFormat": "",
           "format": "table",
           "instant": true,
@@ -486,7 +486,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (route) (route:http_request_duration_seconds:p99{namespace=\"$namespace\", route=~\"$route\"})",
+          "expr": "sum by (path) (path:http_request_duration_seconds:p99{namespace=\"$namespace\", path=~\"$path\"})",
           "legendFormat": "",
           "format": "table",
           "instant": true,
@@ -507,7 +507,7 @@
             },
             "indexByName": {},
             "renameByName": {
-              "route": "Route",
+              "path": "Path",
               "Value #A": "Rate",
               "Value #B": "Error %",
               "Value #C": "p99"

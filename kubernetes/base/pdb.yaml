@@ -2,7 +2,7 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: nimbus-orders-api
+  name: podinfo
   namespace: nimbus
 spec:
   # Percentage so a single PDB travels across overlays without deadlocking the
@@ -10,5 +10,5 @@ spec:
   minAvailable: 50%
   selector:
     matchLabels:
-      app.kubernetes.io/name: nimbus-orders-api
+      app.kubernetes.io/name: podinfo
       app.kubernetes.io/component: api

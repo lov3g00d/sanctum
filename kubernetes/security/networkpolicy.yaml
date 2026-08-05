@@ -37,12 +37,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-orders-api-ingress
+  name: allow-podinfo-ingress
   namespace: nimbus
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: nimbus-orders-api
+      app.kubernetes.io/name: podinfo
       app.kubernetes.io/component: api
   policyTypes:
     - Ingress
@@ -54,7 +54,7 @@ spec:
             cidr: 10.0.0.0/20
       ports:
         - protocol: TCP
-          port: 3000
+          port: 9898
     # Prometheus in the monitoring namespace initiates the scrape, so metrics
     # collection is an ingress rule to the same container port.
     - from:
@@ -63,7 +63,7 @@ spec:
               kubernetes.io/metadata.name: monitoring
       ports:
         - protocol: TCP
-          port: 3000
+          port: 9898
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -73,7 +73,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: nimbus-orders-api
+      app.kubernetes.io/name: podinfo
       app.kubernetes.io/component: api
   policyTypes:
     - Egress

@@ -22,8 +22,8 @@ that sources it owns those.
 
 Probes `/healthz` then `/readyz` with `curl`, retrying each with exponential
 backoff, and exits non-zero if either stays unhealthy. Both endpoints are part
-of the shared service contract (see `app/README.md`), so the same probe works
-against `nimbus-orders-api` and `nimbus-ledger`.
+of the podinfo contract on port 9898 (see `docker/README.md`), so the probe works
+against podinfo directly.
 
 ```sh
 ./health-check.sh https://api.nimbus.example.com 5

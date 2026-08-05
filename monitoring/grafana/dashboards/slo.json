@@ -1,9 +1,9 @@
 {
-  "uid": "nimbus-orders-api-slo",
-  "title": "Nimbus orders-api SLO",
+  "uid": "nimbus-podinfo-slo",
+  "title": "Nimbus podinfo SLO",
   "tags": [
     "nimbus",
-    "orders-api",
+    "podinfo",
     "slo"
   ],
   "timezone": "browser",
@@ -119,7 +119,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * (1 - (sum(increase(http_requests_total{job=\"nimbus-orders-api\", namespace=\"$namespace\", status_code=~\"5..\"}[30d])) / sum(increase(http_requests_total{job=\"nimbus-orders-api\", namespace=\"$namespace\"}[30d]))))",
+          "expr": "100 * (1 - (sum(increase(http_requests_total{job=\"podinfo\", namespace=\"$namespace\", status=~\"5..\"}[30d])) / sum(increase(http_requests_total{job=\"podinfo\", namespace=\"$namespace\"}[30d]))))",
           "legendFormat": "",
           "format": "time_series",
           "instant": true,
@@ -191,7 +191,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * (1 - ((sum(increase(http_requests_total{job=\"nimbus-orders-api\", namespace=\"$namespace\", status_code=~\"5..\"}[30d])) / sum(increase(http_requests_total{job=\"nimbus-orders-api\", namespace=\"$namespace\"}[30d]))) / 0.001))",
+          "expr": "100 * (1 - ((sum(increase(http_requests_total{job=\"podinfo\", namespace=\"$namespace\", status=~\"5..\"}[30d])) / sum(increase(http_requests_total{job=\"podinfo\", namespace=\"$namespace\"}[30d]))) / 0.001))",
           "legendFormat": "",
           "format": "time_series",
           "instant": true,

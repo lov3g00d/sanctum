@@ -1,15 +1,15 @@
 ---
-# SLO gate for the orders-api canary. Both metrics query the precomputed
-# recording rules (see monitoring/prometheus/rules/recording.rules.yml), which
-# aggregate `by (namespace)`, so `{namespace="nimbus"}` returns a single series
-# and result[0] is well defined.
+# SLO gate for the podinfo canary. Both metrics query the precomputed recording
+# rules (see monitoring/prometheus/rules/recording.rules.yml), which aggregate
+# `by (namespace)`, so `{namespace="nimbus"}` returns a single series and
+# result[0] is well defined.
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
 metadata:
-  name: orders-api-slo
+  name: podinfo-slo
   namespace: nimbus
   labels:
-    app.kubernetes.io/name: nimbus-orders-api
+    app.kubernetes.io/name: podinfo
     app.kubernetes.io/part-of: nimbus
 spec:
   metrics:

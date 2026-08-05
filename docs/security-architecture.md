@@ -21,16 +21,15 @@ control belongs.
 | # | Boundary | Crossing | Primary threat |
 |---|----------|----------|----------------|
 | B1 | Internet to edge | Partner/attacker to Cloudflare | Volumetric DDoS, app-layer attacks, bot/credential stuffing |
-| B2 | Edge to AWS | Cloudflare to ALB / API Gateway | Origin bypass (hitting the ALB directly), WAF evasion |
-| B3 | Ingress to workload | ALB to EKS pod, API Gateway to Lambda | Injection, auth bypass, SSRF into the VPC |
-| B4 | Pod to data | orders-api to RDS / Redis / S3 | Lateral movement, data exfil, over-broad DB grants |
+| B2 | Edge to AWS | Cloudflare to ALB | Origin bypass (hitting the ALB directly), WAF evasion |
+| B3 | Ingress to workload | ALB to EKS pod | Injection, auth bypass, SSRF into the VPC |
+| B4 | Pod to data | podinfo to RDS / Redis / S3 | Lateral movement, data exfil, over-broad DB grants |
 | B5 | Supply chain to cluster | CI to ECR to admission | Tampered or unsigned image, malicious dependency |
 | B6 | Operator to control plane | Human/CI to AWS API and K8s API | Credential theft, privilege escalation, config drift |
 
-Two compute planes (EKS and Lambda) share boundaries B1 and B2 behind the same
-edge, and diverge at B3: EKS carries the always-on core with its own network and
-pod-security controls, Lambda carries spiky work with IAM as the primary
-boundary.
+The workload runs on EKS behind the edge. B1 and B2 are the shared edge
+boundaries; B3 is where a request enters the cluster, carrying its own network
+and pod-security controls.
 
 ## STRIDE threat model
 
@@ -170,7 +169,7 @@ a malicious image, and leaked cloud credentials. It assumes the detection layer
 ### 2. Contain
 
 - **Compromised pod.** Isolate before killing, so forensics survive: apply a deny-all NetworkPolicy selecting the pod, or cordon the node. Then capture, then delete. Kubernetes reschedules a clean replica from the signed image.
-- **Malicious image.** `verify-images` should already have blocked an unsigned image; if a signed-but-bad image shipped, revoke by removing the tag, and roll back: `kubectl -n nimbus rollout undo deployment/nimbus-orders-api` (see `cicd/README.md`).
+- **Malicious image.** `verify-images` should already have blocked an unsigned image; if a signed-but-bad image shipped, revoke by removing the tag, and roll back: `kubectl -n nimbus rollout undo deployment/podinfo` (see `cicd/README.md`).
 - **Leaked credential.** IRSA and OIDC creds are short-lived, which shrinks the window. Revoke the IAM role session / rotate the affected secret in Secrets Manager, and tighten the OIDC trust subject if the CI identity is implicated.
 
 ### 3. Eradicate and recover

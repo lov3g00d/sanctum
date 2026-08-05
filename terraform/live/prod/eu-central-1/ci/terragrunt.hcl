@@ -23,8 +23,7 @@ inputs = {
   subject_claims = ["repo:nimbus-org/nimbus:ref:refs/heads/main"]
 
   ecr_repository_arns = [
-    "arn:aws:ecr:${include.root.locals.region}:${include.root.locals.account_id}:repository/nimbus/nimbus-orders-api",
-    "arn:aws:ecr:${include.root.locals.region}:${include.root.locals.account_id}:repository/nimbus/nimbus-ledger",
+    "arn:aws:ecr:${include.root.locals.region}:${include.root.locals.account_id}:repository/nimbus/podinfo",
   ]
 
   eks_cluster_arns = [dependency.cluster.outputs.cluster_arn]

@@ -38,7 +38,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 
 "Right resource, right size, and you measured it."
 
-- Compute split by workload shape: always-on core on EKS, spiky/event-driven on Lambda (`terraform/modules/serverless-api/`). Paying for idle EKS capacity to serve rare endpoints is the anti-pattern this avoids.
+- Right-sizing from real utilization: requests and limits set from observed usage, not guesses, so pods are packed efficiently and nodes are not over-provisioned. Paying for idle headroom is the anti-pattern this avoids.
 - Caching at two layers: Cloudflare CDN at the edge, ElastiCache Redis for hot data.
 - Autoscaling on real signals: HPA on CPU and memory (and custom metrics in reality), Karpenter provisioning right-sized nodes including spot.
 - Right-sizing is driven by the saturation metrics in `monitoring/`, not guesses.
@@ -47,7 +47,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 
 "Are you paying only for what you need, and can you see it?"
 
-- Serverless for low/spiky traffic (pay per request, scale to zero).
+- Scale-in on low traffic: HPA scales pods down and Karpenter consolidates nodes, so idle capacity is released instead of paid for.
 - Karpenter with spot instances for stateless workloads, on-demand for stateful.
 - Environment asymmetry: `dev` runs a single NAT gateway and single-AZ RDS; `prod` runs NAT-per-AZ and Multi-AZ. NAT gateways and cross-AZ data transfer are common surprise line items.
 - Cost is a first-class signal: tag everything (`Project`, `Environment`, `Owner`) so spend is attributable, then alert on anomalies.
@@ -56,7 +56,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 
 "Minimize the resources and energy per unit of work."
 
-- Scale-to-zero serverless, spot capacity reclaiming idle hardware, right-sizing, and Graviton (arm64) as the default instance family where the image supports it. Largely the same actions as cost optimization, measured against carbon rather than dollars.
+- Spot capacity reclaiming idle hardware, node consolidation, right-sizing, and Graviton (arm64) as the default instance family where the image supports it. Largely the same actions as cost optimization, measured against carbon rather than dollars.
 
 ## The review process (the part people forget)
 
@@ -69,5 +69,5 @@ backlog items" signals you have operated it, not just read it.
 
 > "The pillars conflict, so we optimize for the business constraint. For a B2B
 > platform launching now, I bias to reliability and security first, keep cost
-> controlled with serverless and spot for the parts that tolerate it, and treat
+> controlled with spot and right-sizing for the parts that tolerate it, and treat
 > performance tuning as data-driven follow-up once we can see the saturation signals."

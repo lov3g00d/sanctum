@@ -7,7 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: nimbus
 spec:
-  description: Delivery scope for nimbus-orders-api and its observability wiring.
+  description: Delivery scope for podinfo and its observability wiring.
 
   # A source-repo allowlist, not "*": the project can only sync manifests that
   # originate from the platform's own repo.

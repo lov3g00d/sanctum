@@ -1,4 +1,4 @@
-# Hardened reverse proxy in front of nimbus-orders-api.
+# Hardened reverse proxy in front of podinfo.
 # Build from repo root: docker build -f docker/nginx/Dockerfile -t nimbus/nginx .
 #
 # Pin base image by digest in prod, e.g. nginx:1.27-alpine@sha256:<digest>

@@ -18,7 +18,7 @@ client ──DNS──> Cloudflare edge ──TLS/HTTP──> AWS ALB ──> In
 4. **HTTP request.** Now the actual GET/POST flows. Cloudflare applies WAF rules and rate limiting here before forwarding.
 5. **AWS ALB (L7).** Terminates the Cloudflare-to-origin TLS, inspects the HTTP host/path, routes to the target group. An ALB is layer 7 (understands HTTP); an NLB is layer 4 (TCP only, faster, no header awareness). Pick ALB when you need path routing or header inspection, NLB when you need raw throughput or non-HTTP.
 6. **Ingress + Service.** Inside Kubernetes the ALB targets the ingress, which maps the host to a Service. The Service is a stable virtual IP (ClusterIP); kube-proxy (or the CNI's dataplane, Cilium eBPF here in a modern cluster) load-balances across the healthy pod IPs.
-7. **Pod.** The request lands on `nimbus-orders-api:3000`. Response travels back up the same chain.
+7. **Pod.** The request lands on `podinfo:9898`. Response travels back up the same chain.
 
 ## DNS beyond the happy path
 
@@ -48,7 +48,7 @@ over QUIC over UDP, which sidesteps TCP head-of-line blocking.
 
 ## AWS VPC networking
 
-- **Subnets** are AZ-scoped. Nimbus uses three tiers: public (ALB, NAT), private (EKS nodes, Lambda ENIs), data (RDS, ElastiCache). Only the public tier has a route to the internet gateway.
+- **Subnets** are AZ-scoped. Nimbus uses three tiers: public (ALB, NAT), private (EKS nodes), data (RDS, ElastiCache). Only the public tier has a route to the internet gateway.
 - **NAT gateway** lets private subnets make outbound connections (pull images, call APIs) without being reachable inbound. One per AZ in prod so an AZ loss does not sever egress; one shared in dev to save cost.
 - **Security groups vs NACLs:** SGs are stateful (return traffic is auto-allowed), instance-level, allow-only. NACLs are stateless (you must allow both directions), subnet-level, and support explicit deny. Best practice is SGs referencing other SGs (the app SG allows the DB SG), so rules follow workloads, not hardcoded CIDRs.
 - **VPC Flow Logs** capture accepted/rejected connections for forensics and for debugging "why can't A reach B" (look for REJECT).

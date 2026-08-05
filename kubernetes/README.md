@@ -1,9 +1,12 @@
-# Kubernetes: nimbus-orders-api
+# Kubernetes: podinfo
 
-Kustomize manifests for the always-on core API on EKS. The layout separates the
-application workload (Kustomize base + per-env overlays) from the cluster and
-namespace security scaffolding, so a broken app change cannot touch the guardrails
-and the cluster-scoped policies are not duplicated per environment.
+Kustomize manifests for the always-on core API on EKS. The deployable workload is
+upstream [`podinfo`](https://github.com/stefanprodan/podinfo), a public, reproducible
+test image that stands in for the core service so the platform can be exercised end
+to end without shipping bespoke app code. The layout separates the application
+workload (Kustomize base + per-env overlays) from the cluster and namespace security
+scaffolding, so a broken app change cannot touch the guardrails and the
+cluster-scoped policies are not duplicated per environment.
 
 ## Layout
 
@@ -11,7 +14,7 @@ and the cluster-scoped policies are not duplicated per environment.
 kubernetes/
   base/                 app workload, environment-agnostic
     deployment.yaml     hardened securityContext, probes, topology spread
-    service.yaml        ClusterIP 80 -> 3000
+    service.yaml        ClusterIP 80 -> 9898
     ingress.yaml        ALB ingress, TLS via ACM, WAFv2 assoc.
     serviceaccount.yaml IRSA role-arn annotation
     configmap.yaml      non-secret config (endpoints, log level, region)
@@ -41,10 +44,12 @@ kustomize build kubernetes/overlays/prod | kubectl apply -f -
 kustomize build kubernetes/overlays/dev  | kubectl apply -f -
 ```
 
-Secrets are not in Git. The Deployment loads them from a `nimbus-orders-api-secrets`
+Secrets are not in Git. The Deployment loads them from a `podinfo-secrets`
 Secret referenced by name via `envFrom.secretRef`; provision it out of band from AWS
 Secrets Manager (External Secrets Operator or the CSI driver) so credentials never
-reach the repo. Only `configmap.yaml` carries real, non-secret values.
+reach the repo. Only `configmap.yaml` carries real, non-secret values. podinfo itself
+needs no secret to run; the reference is kept so the scoped, least-privilege secret
+read stays part of the manifest set.
 
 ## Security posture
 
@@ -56,7 +61,7 @@ reach the repo. Only `configmap.yaml` carries real, non-secret values.
   capabilities dropped, and `seccompProfile: RuntimeDefault`. The only writable
   path is an `emptyDir` mounted at `/tmp`.
 - **Default-deny NetworkPolicy.** Ingress and egress are denied, then reopened for
-  exactly what the app needs: DNS to kube-dns, ingress on 3000 from the ALB subnet
+  exactly what the app needs: DNS to kube-dns, ingress on 9898 from the ALB subnet
   and from Prometheus in `monitoring`, and egress to RDS (5432) and Redis (6379).
 - **Least-privilege RBAC.** A namespaced Role grants read-only access to the
   workload's own ConfigMap and Secret by name; nothing cluster-wide.

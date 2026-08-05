@@ -1,50 +1,54 @@
 ---
-# Precomputed RED and SLI series for nimbus-orders-api. Recording rules keep the
-# dashboards and burn-rate alerts cheap (the histogram_quantile and ratio work
-# happens once per evaluation, not on every query) and give the alerts a stable
-# series name to reference. Naming follows level:metric:operation.
+# Precomputed RED and SLI series for podinfo. Recording rules keep the dashboards
+# and burn-rate alerts cheap (the histogram_quantile and ratio work happens once
+# per evaluation, not on every query) and give the alerts a stable series name to
+# reference. Naming follows level:metric:operation.
+#
+# podinfo's http_requests_total counter carries only a `status` label (no path or
+# method), so per-path RED comes from the http_request_duration_seconds histogram
+# `_count`, which is labelled by method, path and status.
 groups:
-  - name: orders-api-red.rules
+  - name: podinfo-red.rules
     interval: 30s
     rules:
-      - record: route:http_requests:rate5m
+      - record: path:http_requests:rate5m
         expr: |
-          sum by (namespace, route, method) (
-            rate(http_requests_total{job="nimbus-orders-api"}[5m])
+          sum by (namespace, path) (
+            rate(http_request_duration_seconds_count{job="podinfo"}[5m])
           )
 
-      - record: route:http_requests_errors:rate5m
+      - record: path:http_requests_errors:rate5m
         expr: |
-          sum by (namespace, route, method) (
-            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[5m])
+          sum by (namespace, path) (
+            rate(http_request_duration_seconds_count{job="podinfo", status=~"5.."}[5m])
           )
 
-      - record: route:http_requests:error_ratio5m
+      - record: path:http_requests:error_ratio5m
         expr: |
-          route:http_requests_errors:rate5m
-            / route:http_requests:rate5m
+          path:http_requests_errors:rate5m
+            / path:http_requests:rate5m
 
-      - record: route:http_request_duration_seconds:p50
+      - record: path:http_request_duration_seconds:p50
         expr: |
           histogram_quantile(0.50,
-            sum by (namespace, route, le) (
-              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+            sum by (namespace, path, le) (
+              rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
             )
           )
 
-      - record: route:http_request_duration_seconds:p95
+      - record: path:http_request_duration_seconds:p95
         expr: |
           histogram_quantile(0.95,
-            sum by (namespace, route, le) (
-              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+            sum by (namespace, path, le) (
+              rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
             )
           )
 
-      - record: route:http_request_duration_seconds:p99
+      - record: path:http_request_duration_seconds:p99
         expr: |
           histogram_quantile(0.99,
-            sum by (namespace, route, le) (
-              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+            sum by (namespace, path, le) (
+              rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
             )
           )
 
@@ -52,7 +56,7 @@ groups:
         expr: |
           histogram_quantile(0.99,
             sum by (namespace, le) (
-              rate(http_request_duration_seconds_bucket{job="nimbus-orders-api"}[5m])
+              rate(http_request_duration_seconds_bucket{job="podinfo"}[5m])
             )
           )
 
@@ -60,46 +64,47 @@ groups:
   # 4xx is the caller's fault and does not burn our budget. The four windows are
   # exactly the ones the multi-window burn-rate alerts pair up (5m/1h fast,
   # 30m/6h slow). Division by an empty selector yields NaN when there is no
-  # traffic, which keeps the alerts from firing on an idle service.
-  - name: orders-api-slo.rules
+  # traffic, which keeps the alerts from firing on an idle service. The aggregate
+  # keeps a `namespace` label so the alerts and the canary gate can scope by it.
+  - name: podinfo-slo.rules
     interval: 30s
     rules:
       - record: slo:sli_error:ratio_rate5m
         expr: |
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[5m])
+            rate(http_requests_total{job="podinfo", status=~"5.."}[5m])
           )
           /
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api"}[5m])
+            rate(http_requests_total{job="podinfo"}[5m])
           )
 
       - record: slo:sli_error:ratio_rate30m
         expr: |
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[30m])
+            rate(http_requests_total{job="podinfo", status=~"5.."}[30m])
           )
           /
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api"}[30m])
+            rate(http_requests_total{job="podinfo"}[30m])
           )
 
       - record: slo:sli_error:ratio_rate1h
         expr: |
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[1h])
+            rate(http_requests_total{job="podinfo", status=~"5.."}[1h])
           )
           /
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api"}[1h])
+            rate(http_requests_total{job="podinfo"}[1h])
           )
 
       - record: slo:sli_error:ratio_rate6h
         expr: |
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api", status_code=~"5.."}[6h])
+            rate(http_requests_total{job="podinfo", status=~"5.."}[6h])
           )
           /
           sum by (namespace) (
-            rate(http_requests_total{job="nimbus-orders-api"}[6h])
+            rate(http_requests_total{job="podinfo"}[6h])
           )

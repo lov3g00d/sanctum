@@ -9,17 +9,17 @@ resources:
 
 labels:
   - pairs:
-      app.kubernetes.io/instance: nimbus-orders-api-dev
+      app.kubernetes.io/instance: podinfo-dev
       environment: dev
     includeSelectors: false
 
 images:
-  - name: nimbus/orders-api
-    newName: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/nimbus/orders-api
+  - name: nimbus/podinfo
+    newName: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/nimbus/podinfo
     newTag: dev-a1b2c3d
 
 replicas:
-  - name: nimbus-orders-api
+  - name: podinfo
     count: 2
 
 patches:

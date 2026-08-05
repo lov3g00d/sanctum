@@ -31,14 +31,6 @@ jobs:
       # id-token: write is needed twice here: to assume the AWS role via OIDC,
       # and for cosign keyless signing (Fulcio reads the same GitHub OIDC token).
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: orders-api
-            dockerfile: docker/orders-api.Dockerfile
-          - service: ledger
-            dockerfile: docker/ledger-py.Dockerfile
     steps:
       - uses: actions/checkout@v7
 
@@ -56,16 +48,16 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: docker/podinfo.Dockerfile
           push: true
-          tags: ${{ env.ECR_REGISTRY }}/nimbus/${{ matrix.service }}:${{ github.sha }}
+          tags: ${{ env.ECR_REGISTRY }}/nimbus/podinfo:${{ github.sha }}
           provenance: true
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2
 
       - name: cosign sign (keyless)
         env:
-          IMAGE: ${{ env.ECR_REGISTRY }}/nimbus/${{ matrix.service }}
+          IMAGE: ${{ env.ECR_REGISTRY }}/nimbus/podinfo
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           # Sign by immutable digest, not tag: a tag can be repointed after
@@ -91,15 +83,13 @@ jobs:
       - name: kubeconfig
         run: aws eks update-kubeconfig --name nimbus-dev --region "${AWS_REGION}"
 
-      - name: set image tags and apply
+      - name: set image tag and apply
         run: |
           cd kubernetes/overlays/dev
           kustomize edit set image \
-            nimbus/orders-api="${ECR_REGISTRY}/nimbus/orders-api:${GITHUB_SHA}" \
-            nimbus/ledger="${ECR_REGISTRY}/nimbus/ledger:${GITHUB_SHA}"
+            nimbus/podinfo="${ECR_REGISTRY}/nimbus/podinfo:${GITHUB_SHA}"
           kustomize build . | kubectl apply -f -
-          kubectl -n nimbus rollout status deployment/nimbus-orders-api --timeout=300s
-          kubectl -n nimbus rollout status deployment/nimbus-ledger --timeout=300s
+          kubectl -n nimbus rollout status deployment/podinfo --timeout=300s
 
   dast-dev:
     name: dast baseline (zap)
@@ -142,19 +132,16 @@ jobs:
       - name: kubeconfig
         run: aws eks update-kubeconfig --name nimbus-prod --region "${AWS_REGION}"
 
-      - name: set image tags and apply
+      - name: set image tag and apply
         run: |
           cd kubernetes/overlays/prod
           kustomize edit set image \
-            nimbus/orders-api="${ECR_REGISTRY}/nimbus/orders-api:${GITHUB_SHA}" \
-            nimbus/ledger="${ECR_REGISTRY}/nimbus/ledger:${GITHUB_SHA}"
+            nimbus/podinfo="${ECR_REGISTRY}/nimbus/podinfo:${GITHUB_SHA}"
           kustomize build . | kubectl apply -f -
-          kubectl -n nimbus rollout status deployment/nimbus-orders-api --timeout=300s
-          kubectl -n nimbus rollout status deployment/nimbus-ledger --timeout=300s
+          kubectl -n nimbus rollout status deployment/podinfo --timeout=300s
 
       # Rollback: `kubectl rollout status` above fails the job if a new
       # ReplicaSet never goes Ready, but it does not revert. To roll back:
-      #   kubectl -n nimbus rollout undo deployment/nimbus-orders-api
-      #   kubectl -n nimbus rollout undo deployment/nimbus-ledger
-      # Under ArgoCD the equivalent is `argocd app rollback nimbus-prod <id>`,
+      #   kubectl -n nimbus rollout undo deployment/podinfo
+      # Under ArgoCD the equivalent is `argocd app rollback podinfo-prod <id>`,
       # or enable automated self-heal so drift is reverted to the pinned SHA.

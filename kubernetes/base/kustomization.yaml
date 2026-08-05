@@ -15,12 +15,12 @@ resources:
 
 labels:
   - pairs:
-      app.kubernetes.io/name: nimbus-orders-api
+      app.kubernetes.io/name: podinfo
       app.kubernetes.io/part-of: nimbus
       app.kubernetes.io/component: api
       app.kubernetes.io/managed-by: kustomize
     includeSelectors: false
 
 images:
-  - name: nimbus/orders-api
-    newTag: "0.1.0"
+  - name: nimbus/podinfo
+    newTag: "6.14.1"

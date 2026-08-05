@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: nimbus-orders-api
+  name: podinfo
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: nimbus
@@ -24,7 +24,7 @@ spec:
 
   template:
     metadata:
-      name: 'nimbus-orders-api-{{path.basename}}'
+      name: 'podinfo-{{path.basename}}'
       labels:
         app.kubernetes.io/part-of: nimbus
         environment: '{{path.basename}}'

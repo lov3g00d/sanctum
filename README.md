@@ -17,31 +17,25 @@ secrets. The value is in the shape of the code and the reasoning in `docs/`.
 
 | Path | What it holds |
 |------|---------------|
-| `terraform/modules/` | Reusable plain-Terraform modules: `vpc`, `eks`, `rds`, `serverless-api`, `cloudflare`, `github-oidc`, and `platform` (the Helm addon layer) |
-| `terraform/environments/` | Plain-Terraform `dev`/`prod` roots wiring the modules with S3 + DynamoDB remote state |
-| `terraform/live/` | Terragrunt orchestration over the same modules (DRY multi-environment layer, `dependency`-wired units) |
+| `terraform/modules/` | Reusable modules: `vpc`, `eks`, `rds`, `cloudflare`, `github-oidc`, and `platform` (the Helm addon layer) |
+| `terraform/live/` | Terragrunt env layer: `dev`/`prod` units wiring the modules with S3 + DynamoDB remote state and `dependency`-passed outputs |
 | `kubernetes/` | Kustomize base + `dev`/`prod` overlays, and hardening: Pod Security, default-deny NetworkPolicy, RBAC, Kyverno, HPA/PDB |
 | `gitops/` | ArgoCD `AppProject` + `ApplicationSet` and an Argo Rollout canary gated on the SLO |
 | `security/` | Admission (Kyverno `verifyImages`/cosign), runtime (Falco rules), and posture (kube-bench, Prowler, Trivy) |
 | `monitoring/` | Prometheus rules, Grafana dashboards, Alertmanager, multi-burn-rate SLOs |
-| `docker/` | Non-root distroless images and a hardened Nginx reverse proxy |
+| `docker/` | Multistage Dockerfile that builds the podinfo workload image from pinned source, and a hardened Nginx reverse proxy |
 | `cicd/` | GitHub Actions with shift-left security gates over keyless OIDC |
-| `app/` | Minimal sample workloads: `orders-api` (Node/Express) and `ledger` (Python/FastAPI) |
 | `scripts/` | Hardened Bash: health checks, backups, log rotation, EC2 bootstrap |
 | `docs/` | Architecture and engineering notes (see below) |
 
-## Two infrastructure layers, one set of modules
+## Infrastructure layer
 
-The modules under `terraform/modules/` are plain Terraform. They are consumed two ways:
-
-- **`terraform/environments/`** calls them directly, one root per environment. Simple and
-  self-contained, good for a small number of environments.
-- **`terraform/live/`** wraps them with Terragrunt: each environment is thin config
-  (`env.hcl`) over identical unit definitions, with `dependency` blocks passing outputs
-  between units. This is the DRY path that scales to many environments and accounts.
-
-Both are kept so the tradeoff is visible. They use distinct remote-state keys and are not
-meant to be applied at the same time.
+The modules under `terraform/modules/` are plain Terraform. The `terraform/live/`
+Terragrunt layer composes them: each environment is thin config (`env.hcl`) over
+identical unit definitions (network, cluster, data, edge, ci, platform), with
+`dependency` blocks passing outputs between units. Backend, provider, and wiring are
+defined once in `root.hcl`, so adding an environment is a new `env.hcl`, not a copied
+root module.
 
 ## Platform and delivery
 
@@ -64,9 +58,11 @@ non-root read-only containers), runtime detection (Falco), and posture managemen
 
 ## Workloads
 
-`dev` and `prod` deploy only the two minimal sample services in `app/` as their workloads:
-`orders-api` on the cluster, `ledger` as the serverless path. They exist to exercise the
-platform (health, readiness, metrics, rollouts, policies), not to be a real application.
+`dev` and `prod` deploy a single workload: [podinfo](https://github.com/stefanprodan/podinfo),
+the standard cloud-native test app. It exposes health, readiness, and Prometheus metrics,
+which is enough to exercise the platform end to end (probes, HPA, scraping, SLOs, canary
+rollouts, admission policies). `docker/podinfo.Dockerfile` builds it from pinned upstream
+source. It is a test workload, not a real application.
 
 ## Toolchain
 

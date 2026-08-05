@@ -2,7 +2,7 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: nimbus-orders-api
+  name: podinfo
   namespace: nimbus
 spec:
   minReplicas: 2

@@ -21,11 +21,11 @@
 - list: nimbus_shell_parents
   items: [systemd, containerd-shim, runc, dockerd, docker-init]
 
-# App runs as PID 1 from its image entrypoint (node for orders-api, python for
-# ledger). A shell whose parent is one of these signals an interactive break-in
-# or a webshell, not normal startup.
+# App runs as PID 1 from its image entrypoint (the podinfo binary). A shell whose
+# parent is one of these signals an interactive break-in or a webshell, not
+# normal startup.
 - list: nimbus_expected_entrypoints
-  items: [node, python, python3, uvicorn, gunicorn]
+  items: [podinfo]
 
 - macro: nimbus_workload
   condition: k8s.ns.name = "nimbus"
@@ -118,9 +118,9 @@
 
 - rule: Unexpected outbound connection from nimbus pod
   desc: >
-    Egress from an application pod to a destination outside the VPC CIDR. The
-    orders-api talks only to RDS and Redis inside the data subnets; anything
-    off-cluster is a NetworkPolicy bypass or C2/exfil.
+    Egress from an application pod to a destination outside the VPC CIDR. podinfo
+    talks only to RDS and Redis inside the data subnets; anything off-cluster is
+    a NetworkPolicy bypass or C2/exfil.
   condition: >
     nimbus_workload and container and outbound_offcluster and
     not proc.name in (nimbus_expected_entrypoints)

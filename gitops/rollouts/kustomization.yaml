@@ -6,4 +6,4 @@ namespace: nimbus
 
 resources:
   - analysistemplate-slo.yaml
-  - orders-api-rollout.yaml
+  - podinfo-rollout.yaml

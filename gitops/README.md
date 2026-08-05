@@ -1,4 +1,4 @@
-# GitOps: application delivery for nimbus-orders-api
+# GitOps: application delivery for podinfo
 
 ArgoCD reconciles the Kustomize manifests under `kubernetes/` into the cluster.
 This directory holds the day-2 delivery CRs it acts on: the project that scopes
@@ -35,7 +35,7 @@ An [ApplicationSet](applicationset.yaml) replaces the folder of copies with a
 generator plus one template. The git **directory generator** globs
 `kubernetes/overlays/*` and emits one element per matching directory;
 `{{path.basename}}` is the leaf name (`dev`, `prod`). Each element renders the
-template into an Application named `nimbus-orders-api-<env>` whose `source.path`
+template into an Application named `podinfo-<env>` whose `source.path`
 is that overlay. Add `kubernetes/overlays/staging/` and a staging Application
 appears on the next reconcile with no edit here. One template is the single
 place a delivery-policy change (sync options, project, destination) lands.
@@ -46,7 +46,7 @@ is pruned without a human in the loop.
 
 ### One cluster, one destination: read this before applying
 
-The generated `nimbus-orders-api-dev` and `nimbus-orders-api-prod` both target
+The generated `podinfo-dev` and `podinfo-prod` both target
 `https://kubernetes.default.svc` and namespace `nimbus`, because both overlays
 set that namespace and the `nimbus` AppProject exposes a single in-cluster
 destination. Applied to **one** cluster they would fight over the same resource
@@ -60,7 +60,7 @@ app-of-apps: the fan-out is declarative, not copy-paste.
 ## SLO-gated canary (Argo Rollouts)
 
 `rollouts/` is an opt-in progressive-delivery example. A
-[Rollout](rollouts/orders-api-rollout.yaml) **replaces** the Deployment (you
+[Rollout](rollouts/podinfo-rollout.yaml) **replaces** the Deployment (you
 drop `deployment.yaml` from the overlay and reconcile the Rollout instead); the
 podSpec mirrors the hardened Deployment so the non-root, read-only-rootfs,
 drop-ALL-caps, probe-on-`/healthz`-and-`/readyz` posture is unchanged.
@@ -114,6 +114,6 @@ multi-stage promotion; mentioned here as the next step, not wired up.
 | `appproject.yaml` | `AppProject nimbus`: source-repo allowlist, `nimbus` + `monitoring` destinations, least-privilege resource whitelists |
 | `applicationset.yaml` | Git directory generator over `kubernetes/overlays/*`, one Application per env |
 | `kustomization.yaml` | Collects the project + ApplicationSet (the bootstrap apply) |
-| `rollouts/orders-api-rollout.yaml` | Opt-in Rollout that replaces the Deployment, canary strategy |
+| `rollouts/podinfo-rollout.yaml` | Opt-in Rollout that replaces the Deployment, canary strategy |
 | `rollouts/analysistemplate-slo.yaml` | Prometheus AnalysisTemplate: error-ratio and p99 SLO gates |
 | `rollouts/kustomization.yaml` | Builds the Rollout example on its own |

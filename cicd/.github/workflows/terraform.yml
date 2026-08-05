@@ -18,6 +18,7 @@ concurrency:
 
 env:
   AWS_REGION: eu-central-1
+  TG_VERSION: v1.1.2
 
 jobs:
   plan:
@@ -36,7 +37,7 @@ jobs:
       pull-requests: write
     defaults:
       run:
-        working-directory: terraform/environments/${{ matrix.environment }}
+        working-directory: terraform/live/${{ matrix.environment }}
     steps:
       - uses: actions/checkout@v7
 
@@ -47,19 +48,23 @@ jobs:
 
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
 
-      - name: fmt
-        run: terraform fmt -check -recursive
+      - name: setup terragrunt
+        run: |
+          curl -sSLo /usr/local/bin/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/${TG_VERSION}/terragrunt_linux_amd64"
+          chmod +x /usr/local/bin/terragrunt
+        working-directory: .
 
-      - name: init
-        run: terraform init -input=false
+      - name: fmt
+        run: terragrunt hcl fmt --check --diff
 
       - name: validate
-        run: terraform validate -no-color
+        run: terragrunt hcl validate --all
 
       - name: checkov
         uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf  # v12.1347.0
         with:
-          directory: terraform/environments/${{ matrix.environment }}
+          directory: terraform
           framework: terraform
           soft_fail: false
           output_format: cli
@@ -67,7 +72,7 @@ jobs:
 
       - name: plan
         id: plan
-        run: terraform plan -input=false -no-color -out=tfplan
+        run: terragrunt run --all --non-interactive -- plan -input=false -no-color
         continue-on-error: true
 
       - name: comment plan
@@ -79,7 +84,7 @@ jobs:
         with:
           script: |
             const body = [
-              `### terraform plan \`${process.env.TARGET_ENV}\` - ${process.env.OUTCOME}`,
+              `### terragrunt plan \`${process.env.TARGET_ENV}\` - ${process.env.OUTCOME}`,
               '',
               '<details><summary>Show plan</summary>',
               '',
@@ -121,7 +126,7 @@ jobs:
       id-token: write
     defaults:
       run:
-        working-directory: terraform/environments/${{ matrix.environment }}
+        working-directory: terraform/live/${{ matrix.environment }}
     steps:
       - uses: actions/checkout@v7
 
@@ -132,8 +137,12 @@ jobs:
 
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
 
-      - name: init
-        run: terraform init -input=false
+      - name: setup terragrunt
+        run: |
+          curl -sSLo /usr/local/bin/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/${TG_VERSION}/terragrunt_linux_amd64"
+          chmod +x /usr/local/bin/terragrunt
+        working-directory: .
 
       - name: apply
-        run: terraform apply -input=false -auto-approve
+        run: terragrunt run --all --non-interactive -- apply -input=false -auto-approve

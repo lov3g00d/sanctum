@@ -1,0 +1,20 @@
+# Build context is the repo root, so BuildKit reads this file (named after the
+# Dockerfile) ahead of any context-root .dockerignore. podinfo clones its own
+# source in the builder, so nothing here is COPYed in; this only keeps the
+# context small and free of secrets.
+.git
+.gitignore
+**/.env
+**/.env.*
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+terraform
+kubernetes
+monitoring
+gitops
+cicd
+docs
+scripts
+docker/nginx
+*.md

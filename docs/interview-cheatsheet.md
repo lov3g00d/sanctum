@@ -59,8 +59,8 @@ proxied records hide your origin IP. `terraform/modules/cloudflare/` shows it as
 Know: Lambda execution model (cold start, concurrency, reserved vs provisioned), API
 Gateway (REST vs HTTP API), event sources, when serverless beats containers (spiky,
 low, event-driven) and when it does not (steady high throughput, long-running, heavy
-local state). `terraform/modules/serverless-api/` and `app/ledger-py/` (FastAPI +
-Mangum on Lambda) are your talking props.
+local state). This repo is EKS-centric, so speak to serverless as a design tradeoff
+you reach for when the workload shape fits, not as something wired up here.
 
 ## 3. Rapid-fire by topic
 

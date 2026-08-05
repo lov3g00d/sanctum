@@ -18,16 +18,18 @@ what to look at before they know anything about the service:
 |--------|-----------------|---------------------|
 | Latency | How long requests take (and slow vs fast) | `http_request_duration_seconds` histogram |
 | Traffic | How much demand there is | `http_requests_total` rate |
-| Errors | What share of requests fail | `http_requests_total{status_code=~"5.."}` ratio |
+| Errors | What share of requests fail | `http_requests_total{status=~"5.."}` ratio |
 | Saturation | How close to a resource limit | node CPU/memory/disk, RDS connections/CPU |
 
 ## RED for the service, USE for the resources
 
 The golden signals split cleanly by what you are looking at.
 
-**RED** (Rate, Errors, Duration) fits the request-driven core, `nimbus-orders-api`.
+**RED** (Rate, Errors, Duration) fits the request-driven core, `podinfo`.
 It is exactly latency + traffic + errors, framed per endpoint. The dashboard
-`grafana/dashboards/orders-api-red.json` is nothing but RED, sliced by route.
+`grafana/dashboards/podinfo-red.json` is nothing but RED, sliced by path.
+Because podinfo's request counter carries no path label, the per-path RED series
+come from the `http_request_duration_seconds` histogram `_count`.
 
 **USE** (Utilization, Saturation, Errors) fits the resources underneath: nodes,
 RDS, Redis. For a node you ask how busy it is (utilization), whether work is
@@ -58,7 +60,7 @@ traces to localise it.
 
 ## SLOs and error budgets
 
-We set a Service Level Objective, `nimbus-orders-api` availability >= **99.9%**
+We set a Service Level Objective, `podinfo` availability >= **99.9%**
 over a rolling 30 days, and measure it with an SLI: the ratio of successful
 (non-5xx) requests to total requests. 4xx is the caller's fault and does not
 count against us.
@@ -78,7 +80,7 @@ it before any request failed. They care when requests start failing or slowing.
 
 So the only things that page are user-visible symptoms:
 
-- `OrdersAPIErrorBudgetBurnFast` (the SLO is burning fast)
+- `PodinfoErrorBudgetBurnFast` (the SLO is burning fast)
 - `HighErrorRate` (a blunt backstop for a hard outage)
 
 Everything a customer does not feel yet is a **ticket** to investigate in hours,
@@ -114,7 +116,7 @@ prometheus/rules/alerts.yml          burn-rate, symptom, Kube/Node/RDS, platform
 alertmanager/alertmanager.yml        routing (page->PagerDuty, ticket->Slack), inhibitions
 grafana/provisioning/datasources.yml Prometheus + Loki
 grafana/provisioning/dashboards.yml  file-provider for the dashboards below
-grafana/dashboards/orders-api-red.json  RED, per route
+grafana/dashboards/podinfo-red.json     RED, per path
 grafana/dashboards/slo.json             SLI, error budget, burn rate
 ```
 

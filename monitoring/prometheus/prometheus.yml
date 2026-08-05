@@ -69,14 +69,17 @@ scrape_configs:
         action: drop
         regex: (Failed|Succeeded)
 
-  - job_name: nimbus-orders-api
+  - job_name: podinfo
+    metrics_path: /metrics
     kubernetes_sd_configs:
       - role: endpoints
         namespaces:
           names: [nimbus]
     relabel_configs:
+      # The Service exposes a single port named `http` on 9898; scrape it and
+      # read /metrics off the same port.
       - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-        regex: nimbus-orders-api;metrics
+        regex: podinfo;http
         action: keep
       - source_labels: [__meta_kubernetes_namespace]
         target_label: namespace
@@ -85,7 +88,7 @@ scrape_configs:
       - source_labels: [__meta_kubernetes_pod_node_name]
         target_label: node
       - target_label: job
-        replacement: nimbus-orders-api
+        replacement: podinfo
 
   - job_name: node-exporter
     kubernetes_sd_configs:

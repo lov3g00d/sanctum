@@ -9,17 +9,17 @@ resources:
 
 labels:
   - pairs:
-      app.kubernetes.io/instance: nimbus-orders-api-prod
+      app.kubernetes.io/instance: podinfo-prod
       environment: prod
     includeSelectors: false
 
 images:
-  - name: nimbus/orders-api
-    newName: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/nimbus/orders-api
+  - name: nimbus/podinfo
+    newName: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/nimbus/podinfo
     newTag: 1.8.0
 
 replicas:
-  - name: nimbus-orders-api
+  - name: podinfo
     count: 4
 
 patches:
@@ -28,7 +28,7 @@ patches:
   - path: patch-hpa.yaml
   - target:
       kind: Deployment
-      name: nimbus-orders-api
+      name: podinfo
     patch: |-
       - op: replace
         path: /spec/template/spec/topologySpreadConstraints/0/whenUnsatisfiable
