@@ -38,20 +38,29 @@ variable "eks_admin_arns" {
   default     = []
 }
 
+variable "enable_cloudflare" {
+  description = "Provision the Cloudflare edge. Set false to plan/apply only the AWS resources (e.g. against an account with no Cloudflare zone)."
+  type        = bool
+  default     = true
+}
+
 variable "cloudflare_api_token" {
   description = "Cloudflare API token. Pass via TF_VAR_cloudflare_api_token, never commit it."
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "cloudflare_zone_id" {
   description = "Cloudflare zone ID for nimbus.example.com."
   type        = string
+  default     = ""
 }
 
 variable "cloudflare_origin_hostname" {
   description = "AWS origin hostname Cloudflare proxies to (the orders-api ALB DNS name)."
   type        = string
+  default     = ""
 }
 
 variable "github_subject_claims" {

@@ -68,6 +68,7 @@ module "ledger" {
 
 module "cloudflare" {
   source = "../../modules/cloudflare"
+  count  = var.enable_cloudflare ? 1 : 0
 
   zone_id         = var.cloudflare_zone_id
   origin_hostname = var.cloudflare_origin_hostname

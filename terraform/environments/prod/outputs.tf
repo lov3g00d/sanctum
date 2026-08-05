@@ -34,8 +34,8 @@ output "ledger_api_endpoint" {
 }
 
 output "cloudflare_record" {
-  description = "Proxied hostname served at the Cloudflare edge."
-  value       = module.cloudflare.record_hostname
+  description = "Proxied hostname served at the Cloudflare edge (null when enable_cloudflare is false)."
+  value       = one(module.cloudflare[*].record_hostname)
 }
 
 output "ci_role_arn" {
