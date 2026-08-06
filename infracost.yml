@@ -1,0 +1,10 @@
+---
+version: 0.1
+
+# Both Terragrunt environments. Infracost parses the HCL directly (no terragrunt
+# exec, no AWS credentials, no plan), so this runs as a static PR-time estimate.
+projects:
+  - path: terraform/live/dev
+    name: dev
+  - path: terraform/live/prod
+    name: prod

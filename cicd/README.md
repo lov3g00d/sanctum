@@ -108,7 +108,14 @@ Terragrunt env layer `live/{dev,prod}`, driven with `terragrunt run --all`.
 | Event | Steps | Gate |
 |-------|-------|------|
 | pull_request | hcl fmt, hcl validate, checkov, `run --all plan` posted as a PR comment | checkov hard-fails; plan is reviewed |
+| pull_request | Infracost cost estimate posted as a PR comment | report-only; cost is a review signal |
 | push to main | init, `apply -auto-approve` | Environment approval before apply |
+
+The `cost` job shifts FinOps left: Infracost parses the Terragrunt HCL (no cloud
+credentials, no plan) and comments the projected monthly cost and the per-PR diff,
+so spend is reviewed at PR time, not discovered on the bill. It reads
+`infracost.yml` (both environments) and needs an `INFRACOST_API_KEY` secret (the
+free Infracost pricing-API key).
 
 `plan` runs under a **read-only** OIDC role (`AWS_TF_PLAN_ROLE_ARN`) and posts
 the diff to the PR, so reviewers see exactly what will change before approving.
@@ -207,9 +214,10 @@ attest it, and the cluster runs only what carries your signature.**
 | `AWS_TF_APPLY_ROLE_ARN` | `arn:aws:iam::123456789012:role/nimbus-gha-tf-apply` |
 | `DEV_BASE_URL` | `https://dev-api.nimbus.example.com` |
 
-**Secrets:** only `GITLEAKS_LICENSE`, and only if the repo lives under a GitHub
-org (gitleaks-action requires it for org-owned repos; personal repos need
-nothing). Everything else is OIDC, so there are no cloud credentials to store.
+**Secrets:** `INFRACOST_API_KEY` (free pricing-API key for the cost job), and
+`GITLEAKS_LICENSE` only if the repo lives under a GitHub org (gitleaks-action
+requires it for org-owned repos; personal repos need nothing). Everything else is
+OIDC, so there are no cloud credentials to store.
 
 ## A note on action pinning
 
