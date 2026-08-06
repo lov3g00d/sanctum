@@ -60,6 +60,8 @@ resource "aws_iam_role_policy_attachment" "monitoring" {
 }
 
 resource "aws_db_instance" "this" {
+  # checkov:skip=CKV_AWS_157:Multi-AZ is environment-driven via var.multi_az (prod sets true); dev runs single-AZ deliberately.
+  # checkov:skip=CKV2_AWS_30:postgresql logs already ship to CloudWatch; log_statement=all captures every query (PII/volume) and is not enabled by default on purpose.
   identifier     = var.identifier
   engine         = "postgres"
   engine_version = var.engine_version
@@ -84,6 +86,8 @@ resource "aws_db_instance" "this" {
   db_subnet_group_name   = aws_db_subnet_group.this.name
   vpc_security_group_ids = [aws_security_group.this.id]
   publicly_accessible    = false
+
+  iam_database_authentication_enabled = true
 
   backup_retention_period  = var.backup_retention_period
   copy_tags_to_snapshot    = true
