@@ -37,11 +37,6 @@ variable "state_bucket_arn" {
   type        = string
 }
 
-variable "lock_table_arn" {
-  description = "ARN of the DynamoDB state lock table."
-  type        = string
-}
-
 variable "tags" {
   description = "Tags applied to the IAM resources."
   type        = map(string)

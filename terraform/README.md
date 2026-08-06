@@ -25,32 +25,31 @@ differences live only in `env.hcl`.
 
 ## Remote state and locking
 
-State lives in S3, one object per unit, keyed by `live/<path>/terraform.tfstate`, with
-a DynamoDB lock table. The backend and provider are generated once in `root.hcl` so no
-unit repeats them.
+State lives in S3, one object per unit, keyed by `live/<path>/terraform.tfstate`. The
+backend and provider are generated once in `root.hcl` so no unit repeats them.
 
 ```hcl
 remote_state {
   backend = "s3"
   config = {
-    bucket         = "nimbus-tfstate-<account-id>"
-    key            = "live/${path_relative_to_include()}/terraform.tfstate"
-    region         = "eu-central-1"
-    encrypt        = true
-    dynamodb_table = "nimbus-tflock"
+    bucket       = "nimbus-tfstate-<account-id>"
+    key          = "live/${path_relative_to_include()}/terraform.tfstate"
+    region       = "eu-central-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 ```
 
-`dynamodb_table` gives a distributed lock. Terraform writes a lock item before an apply
-and removes it after, so a second apply against the same state blocks instead of
-interleaving writes, which is what corrupts state. `encrypt = true` keeps the state
-object encrypted at rest, which matters because state can hold resource attributes you
-would not want in plaintext.
+`use_lockfile = true` is S3-native locking (Terraform 1.11+ / OpenTofu): the backend
+writes a `<key>.tflock` object via an S3 conditional write, so a second apply against
+the same state blocks instead of interleaving writes. It replaces the separate DynamoDB
+lock table, which the S3 backend now deprecates. `encrypt = true` keeps the state object
+encrypted at rest, which matters because state can hold resource attributes you would
+not want in plaintext.
 
-The bucket and lock table must exist before the first run. Bootstrap them once per
-account (a small separate root module, or by hand), because a backend cannot create its
-own storage.
+The bucket must exist before the first run. Bootstrap it once per account (a small
+separate root module, or by hand), because a backend cannot create its own storage.
 
 ## Why Terragrunt, and why units
 

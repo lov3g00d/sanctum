@@ -95,18 +95,13 @@ data "aws_iam_policy_document" "ci" {
     resources = [var.state_bucket_arn]
   }
 
+  # S3-native state locking (use_lockfile) writes a <key>.tflock object in the same
+  # bucket, so object write above is the only permission the lock needs. No DynamoDB.
   statement {
     sid       = "TFStateObjects"
     effect    = "Allow"
     actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = ["${var.state_bucket_arn}/*"]
-  }
-
-  statement {
-    sid       = "TFStateLock"
-    effect    = "Allow"
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
-    resources = [var.lock_table_arn]
   }
 }
 

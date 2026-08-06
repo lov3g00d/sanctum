@@ -27,7 +27,7 @@ reciting disconnected facts, and every file here is a concrete thing you can poi
 | Kubernetes namespace | `nimbus` |
 | Observability namespace | `monitoring` |
 | Registry | ECR: `<acct>.dkr.ecr.eu-central-1.amazonaws.com/nimbus/<svc>` |
-| IaC state | S3 bucket `nimbus-tfstate-<acct>`, DynamoDB lock `nimbus-tflock` |
+| IaC state | S3 bucket `nimbus-tfstate-<acct>`, S3-native locking (`use_lockfile`) |
 | Standard tags | `Project=nimbus`, `Environment`, `ManagedBy=terraform`, `Owner=platform-team` |
 
 ## Request path (edge to data)

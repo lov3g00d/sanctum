@@ -28,5 +28,4 @@ inputs = {
 
   eks_cluster_arns = [dependency.cluster.outputs.cluster_arn]
   state_bucket_arn = "arn:aws:s3:::nimbus-tfstate-${include.root.locals.account_id}"
-  lock_table_arn   = "arn:aws:dynamodb:${include.root.locals.region}:${include.root.locals.account_id}:table/nimbus-tflock"
 }

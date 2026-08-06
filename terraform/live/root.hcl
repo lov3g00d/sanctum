@@ -21,11 +21,11 @@ remote_state {
   }
 
   config = {
-    bucket         = "nimbus-tfstate-${local.account_id}"
-    key            = "live/${path_relative_to_include()}/terraform.tfstate"
-    region         = "eu-central-1"
-    dynamodb_table = "nimbus-tflock"
-    encrypt        = true
+    bucket       = "nimbus-tfstate-${local.account_id}"
+    key          = "live/${path_relative_to_include()}/terraform.tfstate"
+    region       = "eu-central-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 
