@@ -1,0 +1,32 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# MITRE ATT&CK for Containers: T1611 Escape to Host.
+# Attempt: join the host PID and network namespaces from a pod in namespace
+# nimbus. hostPID exposes every process on the node (and their /proc,
+# environment, and memory); hostNetwork removes NetworkPolicy isolation and
+# exposes node-local services and the metadata endpoint.
+# Expected outcome: REJECTED at admission. PSA "restricted" forbids
+# hostPID / hostNetwork / hostIPC. The pod never schedules.
+# This manifest is built to fail admission. That rejection is the PASS.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-04-host-namespace
+  namespace: nimbus
+  labels:
+    redteam.nimbus/controlled-test: "true"
+    redteam.nimbus/control-class: admission-deny
+    app.kubernetes.io/part-of: nimbus-redteam
+  annotations:
+    redteam.nimbus/mitre: T1611
+    redteam.nimbus/mitre-name: Escape to Host
+    redteam.nimbus/control: PSA restricted (host namespaces forbidden)
+    redteam.nimbus/expected: Admission DENY - hostPID and hostNetwork are not allowed under restricted
+spec:
+  hostPID: true
+  hostNetwork: true
+  restartPolicy: Never
+  containers:
+    - name: attacker
+      image: docker.io/library/busybox:1.37.0
+      command: ["sh", "-c", "ps aux && sleep 3600"]

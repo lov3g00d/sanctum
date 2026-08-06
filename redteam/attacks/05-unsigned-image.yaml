@@ -1,0 +1,67 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# MITRE ATT&CK for Containers: T1610 Deploy Container (supply chain).
+# Attempt: deploy an image from the nimbus ECR path that carries no valid
+# cosign signature from the CI OIDC identity - the shape of a tampered or
+# attacker-pushed artifact reaching admission.
+#
+# Note on scope: Kyverno verify-image-signatures matches only
+# *.dkr.ecr.eu-central-1.amazonaws.com/nimbus/* and requires a signature
+# from the cd.yml OIDC identity. So this manifest references that repo with
+# an unsigned tag to isolate the signature-verification control. A generic
+# public image (docker.io/library/nginx) is out of scope for verifyImages by
+# design and is instead rejected by disallow-latest-tag plus PSA restricted
+# and the pod-hardening policies (root, writable rootfs, no limits). The pod
+# template below is otherwise policy-clean so the signature check is the only
+# reason it can be denied.
+#
+# Expected outcome: REJECTED at admission by Kyverno verify-image-signatures
+# (Enforce). No valid signature, no schedule.
+# This manifest is built to fail admission. That rejection is the PASS.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rt-05-unsigned-image
+  namespace: nimbus
+  labels:
+    redteam.nimbus/controlled-test: "true"
+    redteam.nimbus/control-class: admission-deny
+    app.kubernetes.io/part-of: nimbus-redteam
+  annotations:
+    redteam.nimbus/mitre: T1610
+    redteam.nimbus/mitre-name: Deploy Container (supply chain)
+    redteam.nimbus/control: Kyverno verify-image-signatures (Enforce)
+    redteam.nimbus/expected: Admission DENY - image carries no valid cosign signature from the CI identity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rt-05-unsigned-image
+  template:
+    metadata:
+      labels:
+        app: rt-05-unsigned-image
+        redteam.nimbus/controlled-test: "true"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        # Unsigned tag in the nimbus ECR repo. cd.yml only ever signs images
+        # by git SHA, so this tag has no signature and fails verification.
+        - name: attacker
+          image: 519111080147.dkr.ecr.eu-central-1.amazonaws.com/nimbus/podinfo:unsigned-attacker
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

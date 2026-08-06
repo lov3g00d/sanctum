@@ -1,0 +1,107 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# kube-hunter run from inside the cluster (--pod), the attacker's-eye view: it
+# enumerates reachable services from a pod's vantage point and reports what an
+# in-cluster foothold can see (API server, kubelet, metadata, dashboards).
+#
+# This is on-demand tooling, not platform config. It lives in its own redteam
+# namespace so it is trivial to delete the whole namespace afterwards, and so
+# it is never picked up by the always-on GitOps reconcile.
+#
+# The redteam namespace enforces PSA baseline rather than restricted: kube-hunter
+# needs a writable scratch dir and outbound probing that the app workload never
+# does. Keep it baseline, keep it short-lived, delete it when done.
+#
+# RUN:
+#   kubectl apply -f kube-hunter-job.yaml
+#   kubectl -n redteam wait --for=condition=complete job/kube-hunter --timeout=300s
+#   kubectl -n redteam logs job/kube-hunter
+#   kubectl delete namespace redteam        # tear down
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redteam
+  labels:
+    app.kubernetes.io/part-of: nimbus-redteam
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-hunter
+  namespace: redteam
+---
+# Read-only discovery. kube-hunter --pod reads the API to enumerate nodes,
+# pods, and services it can reach; grant get/list on exactly those and nothing
+# that could mutate cluster state.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-hunter-read
+rules:
+  - apiGroups: [""]
+    resources: [nodes, namespaces, pods, services, endpoints, serviceaccounts]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-hunter-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-hunter-read
+subjects:
+  - kind: ServiceAccount
+    name: kube-hunter
+    namespace: redteam
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kube-hunter
+  namespace: redteam
+  labels:
+    app.kubernetes.io/name: kube-hunter
+    app.kubernetes.io/component: redteam
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-hunter
+    spec:
+      serviceAccountName: kube-hunter
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kube-hunter
+          image: docker.io/aquasec/kube-hunter:0.6.8
+          # --pod: run as an in-cluster attacker from this pod's vantage point.
+          # --report plain: human-readable to stdout, collected from job logs.
+          args: ["--pod", "--report", "plain", "--log", "info"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,53 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# MITRE ATT&CK for Containers: T1552.001 Unsecured Credentials: Credentials
+# In Files.
+# Attempt: read /etc/shadow in a loop from a pod in namespace nimbus. This
+# pod is fully policy-clean (non-root, read-only rootfs, all caps dropped,
+# seccomp RuntimeDefault, resource limits, pinned tag) so it passes admission
+# on purpose. The point is that the RUNTIME layer, not admission, stops it.
+# Expected outcome: Tetragon TracingPolicy nimbus-block-credential-access
+# SIGKILLs the process on the read of /etc/shadow (kprobe on
+# security_file_permission, mask MAY_READ=4), so the container terminates
+# with exit code 137 and CrashLoops. Falco's sensitive-file-read rule alerts
+# in parallel.
+# Note: the Tetragon kprobe fires on the read() of the file. A non-root
+# process that cannot even open /etc/shadow fails earlier at the open, which
+# is also prevention but not a SIGKILL. The validator treats repeated
+# termination as a block and flags exit 137 as the Tetragon signature.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-06-shadow-read
+  namespace: nimbus
+  labels:
+    redteam.nimbus/controlled-test: "true"
+    redteam.nimbus/control-class: runtime-kill
+    app.kubernetes.io/part-of: nimbus-redteam
+  annotations:
+    redteam.nimbus/mitre: T1552.001
+    redteam.nimbus/mitre-name: Credentials In Files
+    redteam.nimbus/control: Tetragon nimbus-block-credential-access (SIGKILL) + Falco
+    redteam.nimbus/expected: Runtime KILL - process reading /etc/shadow is SIGKILLed (exit 137)
+spec:
+  restartPolicy: Always
+  containers:
+    - name: attacker
+      image: docker.io/library/busybox:1.37.0
+      command: ["sh", "-c", "while true; do cat /etc/shadow; sleep 2; done"]
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+        seccompProfile:
+          type: RuntimeDefault
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi

@@ -15,6 +15,7 @@ as a self-contained study of the pipeline.
 | `ci.yml` | `pull_request` | Shift-left gates. Nothing ships; findings block the merge. |
 | `cd.yml` | push to `main`, tags `v*` | Build, push, sign, deploy dev, DAST, gated prod. |
 | `terraform.yml` | PR / push touching `terraform/**` | Plan on PR (commented), apply on merge (gated). |
+| `redteam.yml` | `workflow_dispatch`, weekly `schedule` | Offensive assurance (kube-hunter, Nuclei DAST, Prowler). Report-only, never blocks. |
 
 ## Shift-left, and why it is fail-early-and-cheap
 

@@ -1,0 +1,32 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# MITRE ATT&CK for Containers: T1610 Deploy Container, T1611 Escape to Host.
+# Attempt: schedule a privileged pod in namespace nimbus. A privileged
+# container shares the host kernel capabilities and devices, the classic
+# first step to a node breakout.
+# Expected outcome: REJECTED at admission. PSA "restricted" forbids
+# privileged, and Kyverno require-drop-all-capabilities / run-as-non-root
+# reject it as well. The pod never schedules.
+# This manifest is built to fail admission. That rejection is the PASS.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-01-privileged
+  namespace: nimbus
+  labels:
+    redteam.nimbus/controlled-test: "true"
+    redteam.nimbus/control-class: admission-deny
+    app.kubernetes.io/part-of: nimbus-redteam
+  annotations:
+    redteam.nimbus/mitre: T1610,T1611
+    redteam.nimbus/mitre-name: Deploy Container / Escape to Host
+    redteam.nimbus/control: PSA restricted + Kyverno pod-security-policies
+    redteam.nimbus/expected: Admission DENY - privileged is forbidden under restricted
+spec:
+  restartPolicy: Never
+  containers:
+    - name: attacker
+      image: docker.io/library/busybox:1.37.0
+      command: ["sh", "-c", "sleep 3600"]
+      securityContext:
+        privileged: true

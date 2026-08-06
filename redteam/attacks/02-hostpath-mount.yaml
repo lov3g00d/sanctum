@@ -1,0 +1,37 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# MITRE ATT&CK for Containers: T1611 Escape to Host.
+# Attempt: mount the host root filesystem (hostPath /) into a pod in
+# namespace nimbus. Writable host root is a direct escape: drop a file in
+# /etc/cron.d or overwrite a kubelet binary and you own the node.
+# Expected outcome: REJECTED at admission. PSA "restricted" forbids hostPath
+# volumes outright. The pod never schedules.
+# This manifest is built to fail admission. That rejection is the PASS.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-02-hostpath
+  namespace: nimbus
+  labels:
+    redteam.nimbus/controlled-test: "true"
+    redteam.nimbus/control-class: admission-deny
+    app.kubernetes.io/part-of: nimbus-redteam
+  annotations:
+    redteam.nimbus/mitre: T1611
+    redteam.nimbus/mitre-name: Escape to Host
+    redteam.nimbus/control: PSA restricted (hostPath volumes forbidden)
+    redteam.nimbus/expected: Admission DENY - hostPath volumes are not allowed under restricted
+spec:
+  restartPolicy: Never
+  containers:
+    - name: attacker
+      image: docker.io/library/busybox:1.37.0
+      command: ["sh", "-c", "ls -la /host && sleep 3600"]
+      volumeMounts:
+        - name: host-root
+          mountPath: /host
+  volumes:
+    - name: host-root
+      hostPath:
+        path: /
+        type: Directory

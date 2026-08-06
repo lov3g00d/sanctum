@@ -1,0 +1,56 @@
+---
+# CONTROLLED TEST - authorized self-validation of the Nimbus platform.
+# MITRE ATT&CK for Containers: T1021 Remote Services (lateral movement).
+# Attempt: from a pod in namespace nimbus, connect to the Kubernetes API
+# service (kubernetes.default, a target outside this namespace's allowed
+# egress) to model a compromised pod reaching across the cluster. This pod is
+# fully policy-clean so it passes admission on purpose.
+# Expected outcome: the default-deny egress NetworkPolicy in nimbus allows
+# only DNS, so the TCP connect is dropped and the probe fails (prints
+# BLOCKED-AS-EXPECTED). Lateral movement out of the namespace is denied at
+# the network layer.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rt-08-lateral-movement
+  namespace: nimbus
+  labels:
+    redteam.nimbus/controlled-test: "true"
+    redteam.nimbus/control-class: network-block
+    app.kubernetes.io/part-of: nimbus-redteam
+  annotations:
+    redteam.nimbus/mitre: T1021
+    redteam.nimbus/mitre-name: Remote Services
+    redteam.nimbus/control: default-deny egress NetworkPolicy (nimbus)
+    redteam.nimbus/expected: Network BLOCK - cross-namespace / control-plane connect is dropped
+spec:
+  restartPolicy: Never
+  containers:
+    - name: attacker
+      image: docker.io/curlimages/curl:8.11.1
+      command: ["sh", "-c"]
+      args:
+        - |
+          if curl -sk --max-time 8 -o /dev/null \
+              https://kubernetes.default.svc.cluster.local:443; then
+            echo "REACHABLE-CONTROL-FAILED"
+          else
+            echo "BLOCKED-AS-EXPECTED"
+          fi
+          sleep 3600
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+        seccompProfile:
+          type: RuntimeDefault
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
