@@ -14,12 +14,13 @@ cluster-wide.
 platform/
   providers.tf              required_providers + kubernetes/helm/kubectl auth (EKS token)
   namespaces.tf             dedicated namespaces with Pod Security Admission labels
-  alb-controller.tf         AWS Load Balancer Controller + IRSA        (kube-system)
-  cert-manager.tf           cert-manager + Route53 DNS01 IRSA          (cert-manager)
-  external-secrets.tf       External Secrets Operator + scoped IRSA    (external-secrets)
-  external-dns.tf           ExternalDNS + Route53 IRSA                 (kube-system)
+  alb-controller.tf         AWS Load Balancer Controller + Pod Identity (kube-system)
+  cert-manager.tf           cert-manager + Route53 DNS01 Pod Identity   (cert-manager)
+  external-secrets.tf       External Secrets Operator + scoped identity (external-secrets)
+  external-dns.tf           ExternalDNS + Route53 Pod Identity          (kube-system)
   metrics-server.tf         metrics-server                            (kube-system)
   karpenter.tf              Karpenter controller + node role + SQS     (kube-system)
+  karpenter-nodepool.tf     Karpenter EC2NodeClass + NodePool          (kube-system)
   kube-prometheus-stack.tf  Prometheus / Alertmanager / Grafana + rules/routing/datasources
   argocd.tf                 Argo CD (HA off)                           (argocd)
   falco.tf                  Falco runtime detection + custom rules     (falco)
@@ -82,10 +83,12 @@ bearer token (`aws_eks_cluster_auth`), keyed off `var.cluster_name`. No kubeconf
 exec plugin is involved, so auth follows whatever AWS credentials the caller (CI runner
 or Terragrunt) already has.
 
-## IRSA and identity
+## Workload identity
 
-Each addon that talks to AWS gets its own IAM role scoped to a single namespace/service
-account through the cluster OIDC provider:
+Each addon that talks to AWS gets its own IAM role bound to a single namespace/service
+account through an EKS Pod Identity association (the `terraform-aws-modules/eks-pod-identity`
+module), not an IRSA/OIDC trust. Pod Identity binds via the association, so the chart's
+ServiceAccount carries no `role-arn` annotation:
 
 | Addon | AWS access |
 |-------|------------|
@@ -93,11 +96,13 @@ account through the cluster OIDC provider:
 | cert-manager | Route53 for ACME DNS01 |
 | ExternalDNS | Route53 record management |
 | External Secrets | custom policy: `secretsmanager:GetSecretValue` + `ssm:GetParameter*`, scoped to `nimbus/*` |
-| Karpenter | controller role via EKS Pod Identity (v21 default), plus node role, instance profile and spot-interruption SQS queue |
+| Prowler (CSPM) | managed `SecurityAudit` + `ViewOnlyAccess` for read-only account inspection |
+| Karpenter | controller role via EKS Pod Identity, plus node role, instance profile and spot-interruption SQS queue |
 
-Karpenter uses Pod Identity rather than IRSA, so the cluster needs the
-`eks-pod-identity-agent` addon. Its `EC2NodeClass`/`NodePool` custom resources are day-2
-tuning and are not delivered by this module.
+Pod Identity replaces IRSA as the default for these workloads, so the cluster needs the
+`eks-pod-identity-agent` addon (installed by the `eks` module). The cluster OIDC provider
+stays available as an IRSA fallback for cases Pod Identity does not cover (Fargate,
+Windows). Karpenter's `EC2NodeClass` and `NodePool` are delivered in `karpenter-nodepool.tf`.
 
 ## What lives elsewhere
 
@@ -112,7 +117,6 @@ everything cluster-wide is Terraform's job.
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `cluster_name` | string | - | Target EKS cluster (`nimbus-dev`, `nimbus-prod`) |
-| `oidc_provider_arn` | string | - | Cluster OIDC provider ARN for IRSA |
 | `vpc_id` | string | - | VPC id (ALB controller) |
 | `region` | string | - | AWS region (`eu-central-1`) |
 | `environment` | string | - | `dev` / `prod`, used for tagging |

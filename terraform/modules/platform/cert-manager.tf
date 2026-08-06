@@ -1,18 +1,21 @@
-# IRSA role for cert-manager to solve ACME DNS01 challenges via Route53. The built-in
-# policy grants the change/list actions cert-manager needs; hosted-zone scoping is left
-# to the default (all zones) since the module contract does not carry a zone id.
-module "cert_manager_irsa" {
+# Pod Identity role for cert-manager to solve ACME DNS01 challenges via Route53. The
+# built-in policy grants the change/list actions cert-manager needs; hosted-zone scoping is
+# left to the default (all zones) since the module contract does not carry a zone id.
+module "cert_manager_pod_identity" {
   count   = var.enable_cert_manager ? 1 : 0
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
-  version = "6.2.1"
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "2.8.2"
 
-  name                       = "cert-manager-${var.cluster_name}"
+  name            = "cert-manager-${var.cluster_name}"
+  use_name_prefix = false
+
   attach_cert_manager_policy = true
 
-  oidc_providers = {
+  associations = {
     this = {
-      provider_arn               = var.oidc_provider_arn
-      namespace_service_accounts = ["cert-manager:cert-manager"]
+      cluster_name    = var.cluster_name
+      namespace       = "cert-manager"
+      service_account = "cert-manager"
     }
   }
 
@@ -42,9 +45,6 @@ resource "helm_release" "cert_manager" {
       serviceAccount = {
         create = true
         name   = "cert-manager"
-        annotations = {
-          "eks.amazonaws.com/role-arn" = module.cert_manager_irsa[0].arn
-        }
       }
     })
   ]

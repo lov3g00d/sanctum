@@ -21,18 +21,16 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
 ---
-# IRSA. The role grants the AWS-managed SecurityAudit + ViewOnlyAccess policies
-# (read-only account inspection) plus s3:PutObject on the findings bucket. The
-# role and the bucket are provisioned in terraform/ (out of scope here); the ARN
-# and bucket name below are placeholders wired to real values there, same as
-# <acct> elsewhere.
+# The AWS side of this ServiceAccount is an EKS Pod Identity association (see cspm.tf),
+# which grants the AWS-managed SecurityAudit + ViewOnlyAccess policies for read-only
+# account inspection. Pod Identity binds via that association, so the ServiceAccount
+# carries no role-arn annotation. The findings-bucket name below is still an <acct>
+# placeholder wired to the real value in terraform/.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: prowler
   namespace: security
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::<acct>:role/nimbus-prowler-cspm
 ---
 apiVersion: batch/v1
 kind: CronJob

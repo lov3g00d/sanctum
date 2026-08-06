@@ -13,7 +13,6 @@ dependency "cluster" {
   mock_outputs = {
     cluster_name           = "nimbus-mock"
     cluster_arn            = "arn:aws:eks:eu-central-1:000000000000:cluster/nimbus-mock"
-    oidc_provider_arn      = "arn:aws:iam::000000000000:oidc-provider/oidc.eks.eu-central-1.amazonaws.com/id/MOCK"
     node_security_group_id = "sg-11111111111111111"
   }
 }
@@ -32,9 +31,8 @@ dependency "network" {
 }
 
 inputs = {
-  cluster_name      = dependency.cluster.outputs.cluster_name
-  oidc_provider_arn = dependency.cluster.outputs.oidc_provider_arn
-  vpc_id            = dependency.network.outputs.vpc_id
-  region            = include.root.locals.region
-  environment       = include.root.locals.environment
+  cluster_name = dependency.cluster.outputs.cluster_name
+  vpc_id       = dependency.network.outputs.vpc_id
+  region       = include.root.locals.region
+  environment  = include.root.locals.environment
 }

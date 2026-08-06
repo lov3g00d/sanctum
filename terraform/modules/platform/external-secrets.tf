@@ -32,21 +32,23 @@ resource "aws_iam_policy" "external_secrets" {
   tags        = local.common_tags
 }
 
-module "external_secrets_irsa" {
+module "external_secrets_pod_identity" {
   count   = var.enable_external_secrets ? 1 : 0
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
-  version = "6.2.1"
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "2.8.2"
 
-  name = "external-secrets-${var.cluster_name}"
+  name            = "external-secrets-${var.cluster_name}"
+  use_name_prefix = false
 
-  policies = {
+  additional_policy_arns = {
     external_secrets = aws_iam_policy.external_secrets[0].arn
   }
 
-  oidc_providers = {
+  associations = {
     this = {
-      provider_arn               = var.oidc_provider_arn
-      namespace_service_accounts = ["external-secrets:external-secrets"]
+      cluster_name    = var.cluster_name
+      namespace       = "external-secrets"
+      service_account = "external-secrets"
     }
   }
 
@@ -71,9 +73,6 @@ resource "helm_release" "external_secrets" {
       serviceAccount = {
         create = true
         name   = "external-secrets"
-        annotations = {
-          "eks.amazonaws.com/role-arn" = module.external_secrets_irsa[0].arn
-        }
       }
 
       replicaCount = 2
@@ -81,9 +80,11 @@ resource "helm_release" "external_secrets" {
   ]
 }
 
-# Cluster-wide entry point for SecretManager-backed ExternalSecrets. Authenticates as the
-# operator service account (which carries the IRSA role above), so individual namespaces
-# reference this store by name without handling AWS credentials.
+# Cluster-wide entry point for SecretManager-backed ExternalSecrets. With Pod Identity the
+# store carries no auth block: ESO uses the controller pod's ambient credentials from the
+# association above (the jwt/serviceAccountRef path is IRSA-only and cannot impersonate a
+# Pod Identity role). Individual namespaces reference this store by name without handling
+# AWS credentials.
 resource "kubectl_manifest" "cluster_secret_store" {
   count = var.enable_external_secrets ? 1 : 0
 
@@ -98,14 +99,6 @@ resource "kubectl_manifest" "cluster_secret_store" {
         aws = {
           service = "SecretsManager"
           region  = var.region
-          auth = {
-            jwt = {
-              serviceAccountRef = {
-                name      = "external-secrets"
-                namespace = "external-secrets"
-              }
-            }
-          }
         }
       }
     }

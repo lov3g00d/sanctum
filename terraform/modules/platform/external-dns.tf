@@ -1,15 +1,18 @@
-module "external_dns_irsa" {
+module "external_dns_pod_identity" {
   count   = var.enable_external_dns ? 1 : 0
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
-  version = "6.2.1"
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "2.8.2"
 
-  name                       = "external-dns-${var.cluster_name}"
+  name            = "external-dns-${var.cluster_name}"
+  use_name_prefix = false
+
   attach_external_dns_policy = true
 
-  oidc_providers = {
+  associations = {
     this = {
-      provider_arn               = var.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:external-dns"]
+      cluster_name    = var.cluster_name
+      namespace       = "kube-system"
+      service_account = "external-dns"
     }
   }
 
@@ -36,9 +39,6 @@ resource "helm_release" "external_dns" {
       serviceAccount = {
         create = true
         name   = "external-dns"
-        annotations = {
-          "eks.amazonaws.com/role-arn" = module.external_dns_irsa[0].arn
-        }
       }
 
       # txt registry with a per-cluster owner id keeps two clusters from fighting over

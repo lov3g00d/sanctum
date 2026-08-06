@@ -4,6 +4,12 @@ locals {
   cluster_tag = var.eks_cluster_name == "" ? {} : {
     "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
   }
+
+  # Karpenter discovers the subnets it can launch nodes into by this tag. Only the private
+  # tier is nodeable, so the tag lives here and not on public/data subnets.
+  discovery_tag = var.eks_cluster_name == "" ? {} : {
+    "karpenter.sh/discovery" = var.eks_cluster_name
+  }
 }
 
 resource "aws_vpc" "this" {
@@ -49,6 +55,7 @@ resource "aws_subnet" "private" {
   tags = merge(
     var.tags,
     local.cluster_tag,
+    local.discovery_tag,
     {
       Name                              = "${var.name}-private-${var.azs[count.index]}"
       Tier                              = "private"

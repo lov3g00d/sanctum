@@ -3,11 +3,6 @@ variable "cluster_name" {
   type        = string
 }
 
-variable "oidc_provider_arn" {
-  description = "ARN of the cluster IRSA/OIDC provider. Used to scope the addon IAM roles to their service accounts."
-  type        = string
-}
-
 variable "vpc_id" {
   description = "VPC the cluster runs in. Required by the AWS Load Balancer Controller."
   type        = string

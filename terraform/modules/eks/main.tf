@@ -44,6 +44,12 @@ module "eks" {
     vpc-cni                = {}
   }
 
+  # Karpenter discovers the node security group by this tag, matching the subnet discovery
+  # tags set in the vpc module, so its EC2NodeClass selectors resolve both from one key.
+  node_security_group_tags = {
+    "karpenter.sh/discovery" = var.cluster_name
+  }
+
   authentication_mode                      = "API"
   enable_cluster_creator_admin_permissions = true
 

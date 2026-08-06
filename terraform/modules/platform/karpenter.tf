@@ -3,9 +3,9 @@
 # module so the two stay in lockstep. v21 wires the controller via EKS Pod Identity
 # rather than IRSA, so this path needs the eks-pod-identity-agent addon on the cluster.
 #
-# The EC2NodeClass and NodePool custom resources are day-2 Kubernetes tuning and are not
-# delivered by this module. This module only provisions the AWS-side identity and the
-# controller install.
+# This module provisions the AWS-side identity and the controller install; the
+# EC2NodeClass and NodePool custom resources that tell Karpenter what to launch live in
+# karpenter-nodepool.tf.
 module "karpenter" {
   count   = var.enable_karpenter ? 1 : 0
   source  = "terraform-aws-modules/eks/aws//modules/karpenter"

@@ -38,7 +38,7 @@ root module.
 ## Platform and delivery
 
 - **Day 1 (platform bootstrap):** `terraform/modules/platform` installs the cluster
-  infrastructure via `helm_release` with per-chart IRSA: AWS Load Balancer Controller,
+  infrastructure via `helm_release` with per-chart EKS Pod Identity: AWS Load Balancer Controller,
   cert-manager, external-secrets, external-dns, metrics-server, Karpenter,
   kube-prometheus-stack, ArgoCD, Argo Rollouts, Falco, and Kyverno. Each addon is
   toggle-gated. The same module delivers the cluster-wide config those engines run:

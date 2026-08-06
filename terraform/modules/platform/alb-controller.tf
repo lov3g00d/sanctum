@@ -1,15 +1,18 @@
-module "alb_controller_irsa" {
+module "alb_controller_pod_identity" {
   count   = var.enable_alb_controller ? 1 : 0
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
-  version = "6.2.1"
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "2.8.2"
 
-  name                                   = "alb-controller-${var.cluster_name}"
-  attach_load_balancer_controller_policy = true
+  name            = "alb-controller-${var.cluster_name}"
+  use_name_prefix = false
 
-  oidc_providers = {
+  attach_aws_lb_controller_policy = true
+
+  associations = {
     this = {
-      provider_arn               = var.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+      cluster_name    = var.cluster_name
+      namespace       = "kube-system"
+      service_account = "aws-load-balancer-controller"
     }
   }
 
@@ -36,9 +39,6 @@ resource "helm_release" "alb_controller" {
       serviceAccount = {
         create = true
         name   = "aws-load-balancer-controller"
-        annotations = {
-          "eks.amazonaws.com/role-arn" = module.alb_controller_irsa[0].arn
-        }
       }
 
       replicaCount = 2
