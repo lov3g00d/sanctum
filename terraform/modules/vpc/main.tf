@@ -79,6 +79,7 @@ resource "aws_subnet" "data" {
 }
 
 resource "aws_eip" "nat" {
+  # checkov:skip=CKV2_AWS_19:this EIP is bound to a NAT gateway (below), not an EC2 instance; the check does not model NAT-gateway association.
   count = local.nat_count
 
   domain = "vpc"
@@ -165,6 +166,7 @@ resource "aws_default_security_group" "this" {
 }
 
 resource "aws_cloudwatch_log_group" "flow_log" {
+  # checkov:skip=CKV_AWS_158:CloudWatch Logs are encrypted at rest with an AWS-owned key by default; a customer-managed CMK here would need its own logs-service key policy for no material gain on flow logs.
   name              = "/aws/vpc/${var.name}/flow-logs"
   retention_in_days = var.flow_log_retention_days
 
