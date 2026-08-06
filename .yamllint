@@ -1,0 +1,29 @@
+---
+# Repo-root config for the whole-repo yamllint gate. Permissive by design: it
+# spans helm values, prometheus rules, workflows, k8s manifests and attack
+# fixtures, whose conventions differ. Per-directory .yamllint files still apply
+# stricter rules when yamllint is run from inside those trees.
+extends: default
+
+# Helm templates are Go templates, not YAML: `{{- ... }}` control blocks are a
+# parser syntax error, so yamllint cannot lint them. values.yaml stays covered.
+ignore: |
+  charts/*/templates/
+
+rules:
+  line-length: disable
+  document-start: disable
+  comments-indentation: disable
+  truthy:
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  indentation:
+    spaces: consistent
+    indent-sequences: whatever
+  braces:
+    max-spaces-inside: 1
+  brackets:
+    max-spaces-inside: 1
+  empty-lines:
+    max: 2

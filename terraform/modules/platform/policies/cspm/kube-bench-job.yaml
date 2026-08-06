@@ -79,6 +79,10 @@ spec:
       containers:
         - name: kube-bench
           image: docker.io/aquasec/kube-bench:v0.16.0
+          # Reads host config read-only; runs as root for host access but never
+          # needs to escalate privileges beyond that.
+          securityContext:
+            allowPrivilegeEscalation: false
           command: [kube-bench]
           args:
             - run

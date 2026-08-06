@@ -22,7 +22,7 @@ jobs:
     name: lint (fmt, tflint, yaml, shell, docker)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
         with:
@@ -38,14 +38,14 @@ jobs:
           tflint --init
           tflint --recursive --minimum-failure-severity=warning
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: '3.12'
 
       - name: yamllint
         run: |
           python -m pip install --quiet yamllint
-          yamllint -c cicd/.yamllint .
+          yamllint -c .yamllint .
 
       - name: shellcheck
         run: |
@@ -64,9 +64,9 @@ jobs:
     name: sast (semgrep)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: '3.12'
 
@@ -82,7 +82,7 @@ jobs:
             --error \
             --sarif --output semgrep.sarif .
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         if: always()
         with:
           name: semgrep-sarif
@@ -93,7 +93,7 @@ jobs:
     name: sca + secrets (trivy fs, gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # gitleaks scans commit history, so it needs the full clone.
           fetch-depth: 0
@@ -107,6 +107,9 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          # redteam/ holds deliberately-insecure attack fixtures, not shipped
+          # config, so they are excluded from the misconfig gate.
+          skip-dirs: redteam
 
       - name: gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
@@ -121,7 +124,7 @@ jobs:
     name: iac (checkov, trivy config)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: checkov
         uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf  # v12.1347.0
@@ -145,7 +148,7 @@ jobs:
     name: build + image scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4.2.0
 

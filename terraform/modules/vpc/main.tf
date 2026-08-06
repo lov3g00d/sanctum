@@ -26,7 +26,8 @@ resource "aws_internet_gateway" "this" {
   tags = merge(var.tags, { Name = "${var.name}-igw" })
 }
 
-resource "aws_subnet" "public" {
+# public subnets host the internet-facing NLB/NAT, so instances need auto-assigned public IPs
+resource "aws_subnet" "public" { # nosemgrep: terraform.aws.security.aws-subnet-has-public-ip-address.aws-subnet-has-public-ip-address
   count = length(var.azs)
 
   vpc_id                  = aws_vpc.this.id

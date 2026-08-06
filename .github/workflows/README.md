@@ -220,12 +220,11 @@ OIDC, so there are no cloud credentials to store.
 
 ## A note on action pinning
 
-Third-party actions are pinned to a **full commit SHA** with the version in a
-trailing comment, so a compromised or retagged upstream release cannot silently
-change what runs (the tj-actions/changed-files supply-chain incident is the
-reference case). First-party `actions/*` are left on major-version tags for
-readability; pinning those to SHA as well is a reasonable hardening step for
-higher-assurance repos.
+Every action is pinned to a **full commit SHA** with the version in a trailing
+comment, so a compromised or retagged upstream release cannot silently change what
+runs (the tj-actions/changed-files supply-chain incident is the reference case).
+First-party `actions/*` are pinned the same way as third-party ones, which is what
+the SAST gate (semgrep `p/ci`) enforces.
 
 Findings are attached as build artifacts (SARIF, SBOM) to keep the top-level
 token read-only. To surface them in the GitHub Security tab instead, grant the
