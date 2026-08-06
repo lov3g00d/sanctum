@@ -47,3 +47,5 @@ generate "provider" {
     }
   EOF
 }
+
+# CI demo: trigger the plan + cost + gate workflows on this PR.
