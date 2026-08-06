@@ -64,6 +64,25 @@ jobs:
           # signing, a digest cannot. Signature and cert land in the OIDC log.
           cosign sign --yes "${IMAGE}@${DIGEST}"
 
+      - name: sbom (spdx-json)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
+        with:
+          image: ${{ env.ECR_REGISTRY }}/nimbus/podinfo@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: cosign attest sbom (keyless)
+        env:
+          IMAGE: ${{ env.ECR_REGISTRY }}/nimbus/podinfo
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          # Attach the SBOM to the image as an spdxjson in-toto attestation, signed
+          # by the same keyless OIDC identity as the signature above and logged in
+          # Rekor. This is what the Kyverno require-sbom-attestation policy verifies
+          # at admission. Attest by digest for the same reason we sign by digest.
+          cosign attest --yes --predicate sbom.spdx.json \
+            --type spdxjson "${IMAGE}@${DIGEST}"
+
   deploy-dev:
     name: deploy dev
     needs: build-push

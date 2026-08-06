@@ -87,6 +87,12 @@ variable "enable_falco" {
   default     = true
 }
 
+variable "enable_tetragon" {
+  description = "Install Tetragon for eBPF runtime enforcement (complements Falco detection)."
+  type        = bool
+  default     = true
+}
+
 variable "enable_kyverno" {
   description = "Install Kyverno as the policy admission engine."
   type        = bool
@@ -101,6 +107,12 @@ variable "enable_kyverno_policies" {
 
 variable "enable_cspm" {
   description = "Deliver the CSPM scanners (kube-bench Job, Prowler CronJob)."
+  type        = bool
+  default     = true
+}
+
+variable "enable_trivy_operator" {
+  description = "Install Trivy Operator for continuous in-cluster vulnerability, config, secret and RBAC scanning."
   type        = bool
   default     = true
 }
@@ -207,6 +219,18 @@ variable "kyverno_chart_version" {
   description = "kyverno chart version."
   type        = string
   default     = "3.8.2"
+}
+
+variable "tetragon_chart_version" {
+  description = "tetragon chart version."
+  type        = string
+  default     = "1.7.0"
+}
+
+variable "trivy_operator_chart_version" {
+  description = "trivy-operator chart version."
+  type        = string
+  default     = "0.35.0"
 }
 
 variable "loki_chart_version" {

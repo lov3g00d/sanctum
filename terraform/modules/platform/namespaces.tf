@@ -99,6 +99,20 @@ resource "kubernetes_namespace" "falco" {
   }
 }
 
+resource "kubernetes_namespace" "trivy_operator" {
+  count = var.enable_trivy_operator ? 1 : 0
+
+  metadata {
+    name = "trivy-system"
+    labels = {
+      "app.kubernetes.io/managed-by"       = "terraform"
+      "pod-security.kubernetes.io/enforce" = "restricted"
+      "pod-security.kubernetes.io/audit"   = "restricted"
+      "pod-security.kubernetes.io/warn"    = "restricted"
+    }
+  }
+}
+
 resource "kubernetes_namespace" "kyverno" {
   count = var.enable_kyverno ? 1 : 0
 

@@ -75,6 +75,7 @@ OIDC token.
 |-------|-------------|------|
 | build-push | Build the image, push to ECR tagged by git SHA | trivy already gated on PR |
 | build-push | `cosign sign` keyless, by digest | supply-chain provenance |
+| build-push | `cosign attest` the syft SBOM as an spdxjson attestation | supply-chain provenance |
 | deploy-dev | `kustomize build overlays/dev \| kubectl apply`, wait for rollout | rollout status |
 | dast-dev | OWASP ZAP baseline against the dev endpoint | report-only |
 | deploy-prod | Same rollout against prod | **manual approval** (Environment) |
@@ -159,20 +160,24 @@ The role is provisioned by the `github-oidc` terraform module.
 Three links, each meaningless without the others:
 
 1. **SBOM (syft, SPDX-json).** CI produces a per-image component inventory.
-   When the next Log4Shell lands, you answer "are we affected?" from the SBOM
-   in seconds instead of rebuilding to find out.
+   CD regenerates it for the pushed image and attaches it with
+   `cosign attest --type spdxjson` as an spdxjson in-toto attestation, signed by
+   the same keyless OIDC identity and logged in Rekor. When the next Log4Shell
+   lands, you answer "are we affected?" from the SBOM in seconds instead of
+   rebuilding to find out.
 2. **Signing (cosign, keyless).** CD signs the pushed image **by digest** using
    the same GitHub OIDC identity. The signature and its certificate are logged
    in the public transparency log (Rekor). No long-lived signing key exists to
    steal.
 3. **Admission verification.** The cluster refuses to run what it cannot verify.
-   A policy controller (Sigstore policy-controller, Kyverno, or Connaisseur)
-   admits only images signed by the expected OIDC identity and issuer. Sign
-   without enforcing verification and the signature is decoration; enforce
+   Kyverno's `verify-image-signatures` (Enforce) admits only images signed by the
+   expected OIDC identity and issuer, and `require-sbom-attestation` (Audit)
+   checks the spdxjson attestation is present and signed by the same identity.
+   Sign without enforcing verification and the signature is decoration; enforce
    without signing and nothing deploys.
 
-The chain closes the loop: **you build it, you inventory it, you sign it, and
-the cluster runs only what carries your signature.**
+The chain closes the loop: **you build it, you inventory it, you sign it, you
+attest it, and the cluster runs only what carries your signature.**
 
 ## Required repo configuration
 
