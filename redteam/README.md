@@ -106,7 +106,7 @@ Pacu and ScoutSuite are interactive AWS enumeration; follow `tools/pacu.md` and
 
 ## CI
 
-`cicd/.github/workflows/redteam.yml` runs a report-only version of this on
+`.github/workflows/redteam.yml` runs a report-only version of this on
 `workflow_dispatch` and weekly: kube-hunter, a Nuclei DAST pass against the dev
 endpoint, and a read-only Prowler sweep. It never blocks a merge or a deploy; it
 is scheduled assurance, and its findings are uploaded as artifacts for triage.

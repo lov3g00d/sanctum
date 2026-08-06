@@ -49,9 +49,9 @@ detection or accepted.
 
 | Threat | Vector | Control | Where |
 |--------|--------|---------|-------|
-| Tampering / EoP | Injection, insecure deserialization | semgrep SAST fail-closed on PR | `cicd/ci.yml` |
-| Spoofing | Weak/absent authn on endpoints | App-layer auth; edge WAF; DAST baseline surfaces gaps | `cicd/cd.yml` (ZAP) |
-| Info disclosure | Verbose errors, missing headers | DAST baseline flags headers/cookies for triage | `cicd/cd.yml` |
+| Tampering / EoP | Injection, insecure deserialization | semgrep SAST fail-closed on PR | `.github/workflows/ci.yml` |
+| Spoofing | Weak/absent authn on endpoints | App-layer auth; edge WAF; DAST baseline surfaces gaps | `.github/workflows/cd.yml` (ZAP) |
+| Info disclosure | Verbose errors, missing headers | DAST baseline flags headers/cookies for triage | `.github/workflows/cd.yml` |
 | EoP | SSRF pivoting into the VPC | Default-deny egress NetworkPolicy limits where a pod can reach | `terraform/modules/platform/policies/cluster/networkpolicy.yaml` |
 
 ### B4 pod to data
@@ -69,18 +69,18 @@ detection or accepted.
 | Threat | Vector | Control | Where |
 |--------|--------|---------|-------|
 | Tampering | Malicious image pushed to ECR | Kyverno `verify-images` admits only images signed by the CI OIDC identity (Enforce) | `terraform/modules/platform/policies/kyverno/verify-images.yaml` |
-| Tampering | Vulnerable dependency shipped | trivy fs + image scans fail-closed on HIGH/CRITICAL fixable | `cicd/ci.yml` |
-| Repudiation | "Which images have package X?" unanswerable | syft SBOM per image | `cicd/ci.yml` |
+| Tampering | Vulnerable dependency shipped | trivy fs + image scans fail-closed on HIGH/CRITICAL fixable | `.github/workflows/ci.yml` |
+| Repudiation | "Which images have package X?" unanswerable | syft SBOM per image | `.github/workflows/ci.yml` |
 | Provenance gap | No verifiable bill of materials at admission | SBOM attestation policy (Audit, aspirational; needs `cosign attest` in CI) | `terraform/modules/platform/policies/kyverno/require-signed-and-sbom.yaml` |
 
 ### B6 control plane
 
 | Threat | Vector | Control | Where |
 |--------|--------|---------|-------|
-| Spoofing | Leaked long-lived AWS keys | GitHub OIDC, no static keys; trust scoped to repo + ref | `cicd/README.md`, `terraform/modules/github-oidc/` |
-| EoP | CI role too broad | Split roles per stage (deploy / tf-plan / tf-apply), least privilege | `cicd/cd.yml`, `terraform/` |
+| Spoofing | Leaked long-lived AWS keys | GitHub OIDC, no static keys; trust scoped to repo + ref | `.github/workflows/README.md`, `terraform/modules/github-oidc/` |
+| EoP | CI role too broad | Split roles per stage (deploy / tf-plan / tf-apply), least privilege | `.github/workflows/cd.yml`, `terraform/` |
 | Tampering | Manual console change bypassing IaC | Prowler CSPM catches account drift; kube-bench catches cluster drift | `terraform/modules/platform/policies/cspm/` |
-| Repudiation | No record of who changed what | CloudTrail + branch protection + reviewed PRs | scenario, `cicd/README.md` |
+| Repudiation | No record of who changed what | CloudTrail + branch protection + reviewed PRs | scenario, `.github/workflows/README.md` |
 
 ## Controls matrix
 
@@ -90,13 +90,13 @@ block, and the matrix is honest about which is which.
 
 | Control | Implemented in | Mitigates | State |
 |---------|----------------|-----------|-------|
-| Secret detection | `.pre-commit-config.yaml`, `cicd/ci.yml` (gitleaks) | Leaked credentials | Enforced (CI) |
-| SAST | `cicd/ci.yml` (semgrep) | Injection, insecure code | Enforced |
-| SCA / dependency CVE | `cicd/ci.yml` (trivy fs) | Vulnerable dependencies | Enforced (HIGH/CRITICAL fixable) |
-| IaC misconfig | `.pre-commit-config.yaml`, `cicd/` (checkov, trivy config) | Open SG, public bucket, unencrypted store | Enforced |
-| Image CVE (build) | `cicd/ci.yml` (trivy image) | Vulnerable OS/runtime packages | Enforced |
-| SBOM | `cicd/` (syft) | Unanswerable CVE exposure questions | Produced (artifact) |
-| Image signing | `cicd/cd.yml` (cosign keyless) | Tampered artifact | Enforced (signs by digest) |
+| Secret detection | `.pre-commit-config.yaml`, `.github/workflows/ci.yml` (gitleaks) | Leaked credentials | Enforced (CI) |
+| SAST | `.github/workflows/ci.yml` (semgrep) | Injection, insecure code | Enforced |
+| SCA / dependency CVE | `.github/workflows/ci.yml` (trivy fs) | Vulnerable dependencies | Enforced (HIGH/CRITICAL fixable) |
+| IaC misconfig | `.pre-commit-config.yaml`, `.github/workflows/` (checkov, trivy config) | Open SG, public bucket, unencrypted store | Enforced |
+| Image CVE (build) | `.github/workflows/ci.yml` (trivy image) | Vulnerable OS/runtime packages | Enforced |
+| SBOM | `.github/workflows/` (syft) | Unanswerable CVE exposure questions | Produced (artifact) |
+| Image signing | `.github/workflows/cd.yml` (cosign keyless) | Tampered artifact | Enforced (signs by digest) |
 | Signature verification | `terraform/modules/platform/policies/kyverno/verify-images.yaml` | Unsigned/foreign image scheduled | **Enforce** |
 | SBOM attestation | `terraform/modules/platform/policies/kyverno/require-signed-and-sbom.yaml` | No verifiable BOM at admission | **Audit (aspirational)** |
 | Pod Security Admission | `terraform/modules/platform/policies/cluster/namespace.yaml` | Privileged/root/host-mount pods | Enforced (`restricted`) |
@@ -105,7 +105,7 @@ block, and the matrix is honest about which is which.
 | Least-privilege RBAC | `terraform/modules/platform/policies/cluster/rbac.yaml` | Token enumerating other secrets | Enforced (namespaced, by name) |
 | Workload identity | `charts/podinfo/templates/serviceaccount.yaml` (IRSA) | Node-wide credential blast radius | Enforced |
 | Runtime detection | `terraform/modules/platform/config/falco-rules.yaml` | Shell, exfil, tampering, token theft | Detect (alert) |
-| DAST | `cicd/cd.yml` (ZAP baseline) | Runtime exposure static analysis misses | Report-only |
+| DAST | `.github/workflows/cd.yml` (ZAP baseline) | Runtime exposure static analysis misses | Report-only |
 | Cluster CIS audit | `terraform/modules/platform/policies/cspm/kube-bench-job.yaml` | Node/cluster misconfig vs CIS EKS | Audit (on demand) |
 | Continuous cluster posture | `docs/trivy-operator.md` | Running-image CVE, config/RBAC drift | Detect (continuous) |
 | AWS CSPM | `terraform/modules/platform/policies/cspm/prowler-cronjob.yaml` | Account drift vs CIS AWS Foundations | Audit (weekly) |
@@ -169,7 +169,7 @@ a malicious image, and leaked cloud credentials. It assumes the detection layer
 ### 2. Contain
 
 - **Compromised pod.** Isolate before killing, so forensics survive: apply a deny-all NetworkPolicy selecting the pod, or cordon the node. Then capture, then delete. Kubernetes reschedules a clean replica from the signed image.
-- **Malicious image.** `verify-images` should already have blocked an unsigned image; if a signed-but-bad image shipped, revoke by removing the tag, and roll back: `kubectl -n nimbus rollout undo deployment/podinfo` (see `cicd/README.md`).
+- **Malicious image.** `verify-images` should already have blocked an unsigned image; if a signed-but-bad image shipped, revoke by removing the tag, and roll back: `kubectl -n nimbus rollout undo deployment/podinfo` (see `.github/workflows/README.md`).
 - **Leaked credential.** IRSA and OIDC creds are short-lived, which shrinks the window. Revoke the IAM role session / rotate the affected secret in Secrets Manager, and tighten the OIDC trust subject if the CI identity is implicated.
 
 ### 3. Eradicate and recover

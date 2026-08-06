@@ -1,6 +1,6 @@
 # Trivy Operator: in-cluster posture
 
-CI (`cicd/ci.yml`) scans images once, at build time, against the CVE database of
+CI (`.github/workflows/ci.yml`) scans images once, at build time, against the CVE database of
 that day. That snapshot goes stale: a new CVE published after the image ships is
 invisible until the next rebuild. Trivy Operator closes that gap by scanning
 what is actually running, continuously, from inside the cluster, and by

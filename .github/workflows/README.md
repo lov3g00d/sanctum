@@ -1,14 +1,13 @@
-# cicd
+# CI/CD
 
-CI/CD for Nimbus. Three GitHub Actions workflows under
-`.github/workflows/`, built around one idea: **shift-left**. Every check runs
-at the earliest point it can, so a problem is caught where it is cheapest to
-fix (a red PR check) rather than where it is most expensive (a signed image in
+GitHub Actions workflows for Nimbus, built around one idea: **shift-left**. Every
+check runs at the earliest point it can, so a problem is caught where it is cheapest
+to fix (a red PR check) rather than where it is most expensive (a signed image in
 prod, or an incident).
 
-Layout mirrors a real repo root. In this repo these live at
-`/.github/workflows/`; they are kept under `cicd/` here so the directory reads
-as a self-contained study of the pipeline.
+Four workflows: `ci.yml` (PR gates), `cd.yml` (build/sign/attest/deploy),
+`terraform.yml` (plan + cost on PR, gated apply on merge), and `redteam.yml`
+(scheduled offensive assurance).
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|

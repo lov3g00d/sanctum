@@ -10,7 +10,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 
 "Can you run, observe, and improve the system safely?"
 
-- Everything is code: infra in `terraform/`, app config in `charts/podinfo/`, pipelines in `cicd/`. No console clicks that drift from source of truth.
+- Everything is code: infra in `terraform/`, app config in `charts/podinfo/`, pipelines in `.github/workflows/`. No console clicks that drift from source of truth.
 - Small, frequent, reversible changes: CI gates + `kubectl rollout` with automatic halt on failed readiness, `rollout undo` for rollback.
 - Observability before features: the platform's kube-prometheus-stack ships dashboards, SLOs, and runbook links from day one.
 - Game days / failure injection belong here (chaos testing pods and AZ loss).
@@ -23,7 +23,7 @@ design questions it asks, what Nimbus does about it, and where in this repo.
 - Network: default-deny NetworkPolicy in `terraform/modules/platform/policies/cluster/`, private subnets for compute and data, security groups referencing other SGs rather than CIDRs.
 - Data: KMS encryption at rest on RDS/S3/EKS secrets, TLS in transit, secrets in Secrets Manager/SSM, never in Git (`.gitignore` + gitleaks).
 - Edge: Cloudflare WAF, rate limiting, and authenticated origin pulls so the AWS origin only trusts Cloudflare.
-- The whole `cicd/` security-gate chain is this pillar shifted left. See [`devsecops-shift-left.md`](devsecops-shift-left.md).
+- The whole `.github/workflows/` security-gate chain is this pillar shifted left. See [`devsecops-shift-left.md`](devsecops-shift-left.md).
 
 ## 3. Reliability
 

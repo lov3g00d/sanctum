@@ -22,7 +22,7 @@ secrets. The value is in the shape of the code and the reasoning in `docs/`.
 | `charts/podinfo/` | Helm chart for the podinfo app: Rollout/Deployment, service, ingress, HPA/PDB, network policies, ServiceMonitor, PrometheusRule, SLO dashboards |
 | `gitops/` | ArgoCD `AppProject` + `ApplicationSet` delivering only the podinfo workload chart per environment |
 | `docker/` | Multistage Dockerfile that builds the podinfo workload image from pinned source, and a hardened Nginx reverse proxy |
-| `cicd/` | GitHub Actions with shift-left security gates over keyless OIDC |
+| `.github/workflows/` | GitHub Actions with shift-left security gates over keyless OIDC |
 | `scripts/` | Hardened Bash: health checks, backups, log rotation, EC2 bootstrap |
 | `docs/` | Architecture and engineering notes (see below) |
 

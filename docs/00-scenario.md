@@ -92,5 +92,5 @@ Details and the numbers (RTO/RPO, health-check tuning) live in
 | Linux + Bash | `scripts/` |
 | Nginx / container workload | `docker/nginx/`, `docker/podinfo.Dockerfile` |
 | Networking (TCP/IP, DNS, HTTP) | [`networking-fundamentals.md`](networking-fundamentals.md) |
-| Security in the SDLC | `cicd/`, [`devsecops-shift-left.md`](devsecops-shift-left.md) |
+| Security in the SDLC | `.github/workflows/`, [`devsecops-shift-left.md`](devsecops-shift-left.md) |
 | Root-cause / troubleshooting | [`interview-cheatsheet.md`](interview-cheatsheet.md) |

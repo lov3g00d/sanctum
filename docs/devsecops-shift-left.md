@@ -29,7 +29,7 @@ is for enforcement.
 
 ## Stage 1 - pull request (CI, fail-closed)
 
-`cicd/.github/workflows/ci.yml`. Nothing merges if a gate fails above threshold.
+`.github/workflows/ci.yml`. Nothing merges if a gate fails above threshold.
 
 | Gate | Tool | What it catches | Fails on |
 |------|------|-----------------|----------|
@@ -46,7 +46,7 @@ and you need all three.
 
 ## Stage 2 - build and release (supply chain)
 
-`cicd/.github/workflows/cd.yml`. The threat here is a tampered artifact, not a bug in
+`.github/workflows/cd.yml`. The threat here is a tampered artifact, not a bug in
 your code.
 
 - **SBOM** with syft: you cannot respond to the next Log4Shell in hours if you do not already know which images contain the package. The SBOM is the inventory.
