@@ -21,6 +21,10 @@ ARG PODINFO_VERSION=6.14.1
 RUN git clone --depth 1 --branch "${PODINFO_VERSION}" \
       https://github.com/stefanprodan/podinfo.git .
 
+# podinfo 6.14.1 still pins golang.org/x/text v0.37.0, which carries CVE-2026-56852
+# (DoS). Force the patched 0.39.0 before building. Drop once upstream bumps it.
+RUN go get golang.org/x/text@v0.39.0 && go mod tidy
+
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-s -w" \
       -o /out/podinfo ./cmd/podinfo
 
