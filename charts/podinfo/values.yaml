@@ -74,7 +74,7 @@ rollout:
 ingress:
   enabled: true
   className: alb
-  host: podinfo.sandbox.zmkv.online
+  host: podinfo.example.com
   # ACM cert and WAFv2 ACL are placeholders; Terraform wires the real ARNs.
   certificateArn: arn:aws:acm:eu-central-1:123456789012:certificate/REPLACE_ME
   wafAclArn: ""

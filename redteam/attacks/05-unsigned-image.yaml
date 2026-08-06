@@ -52,7 +52,7 @@ spec:
         # Unsigned tag in the nimbus ECR repo. cd.yml only ever signs images
         # by git SHA, so this tag has no signature and fails verification.
         - name: attacker
-          image: 519111080147.dkr.ecr.eu-central-1.amazonaws.com/nimbus/podinfo:unsigned-attacker
+          image: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/nimbus/podinfo:unsigned-attacker
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

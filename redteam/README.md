@@ -12,7 +12,7 @@ attacks"), this directory is the test that backs the claim.
 ## Authorization and scope
 
 This is authorized self-validation of the operator's **own** reference platform
-and **own** sandbox AWS account (`519111080147`). Nothing here targets a
+and **own** sandbox AWS account (`123456789012`). Nothing here targets a
 third party. The Kubernetes attempts run against a cluster you own; the AWS
 runbooks (`tools/pacu.md`, `tools/scoutsuite.md`) run read-only against your own
 account with the `SecurityAudit` credentials. Do not point any of this at

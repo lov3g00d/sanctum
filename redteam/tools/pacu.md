@@ -10,7 +10,7 @@ these credentials, can I escalate?"
 
 ## Scope and authorization
 
-- Target: the operator's OWN sandbox AWS account `519111080147`, nothing else.
+- Target: the operator's OWN sandbox AWS account `123456789012`, nothing else.
 - Credentials: the read-only `SecurityAudit` + `ViewOnlyAccess` identity already
   used by the CSPM tooling. Pacu is driven read-only here: run enumeration
   modules, not the exploitation modules that create or modify resources.

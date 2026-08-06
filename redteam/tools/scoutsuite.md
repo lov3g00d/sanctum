@@ -14,7 +14,7 @@ cross-service sweep when you want to eyeball the whole account at once.
 
 ## Scope and authorization
 
-- Target: the operator's OWN sandbox AWS account `519111080147`, nothing else.
+- Target: the operator's OWN sandbox AWS account `123456789012`, nothing else.
 - Credentials: the read-only `SecurityAudit` + `ViewOnlyAccess` identity used by
   the CSPM tooling. ScoutSuite is read-only by design (it only calls `Describe*`,
   `List*`, and `Get*`), so no write access is needed or wanted.
