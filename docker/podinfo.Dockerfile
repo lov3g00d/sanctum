@@ -46,6 +46,7 @@ EXPOSE 9898
 USER 10001:10001
 
 # busybox wget ships in alpine, so the probe needs no curl or extra interpreter.
+# hadolint ignore=DL3025  shell form is required for the `|| exit 1` fallback
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -q -O /dev/null http://127.0.0.1:9898/healthz || exit 1
 

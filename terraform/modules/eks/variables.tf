@@ -20,9 +20,9 @@ variable "private_subnet_ids" {
 }
 
 variable "endpoint_public_access" {
-  description = "Whether the public API endpoint is enabled. When true, restrict it with public_access_cidrs."
+  description = "Whether the public API endpoint is enabled. Off by default (private); an environment opts in and must restrict it with public_access_cidrs."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "public_access_cidrs" {

@@ -110,6 +110,9 @@ jobs:
           # redteam/ holds deliberately-insecure attack fixtures, not shipped
           # config, so they are excluded from the misconfig gate.
           skip-dirs: redteam
+          # trivy misreads per-Dockerfile .dockerignore files as Dockerfiles and
+          # errors on their glob patterns; they carry no config to scan.
+          skip-files: "**/*.dockerignore"
 
       - name: gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
