@@ -39,7 +39,7 @@ jobs:
       run:
         working-directory: terraform/live/${{ matrix.environment }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
         with:
@@ -76,7 +76,7 @@ jobs:
         continue-on-error: true
 
       - name: comment plan
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
         env:
           PLAN: ${{ steps.plan.outputs.stdout }}
           TARGET_ENV: ${{ matrix.environment }}
@@ -117,7 +117,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: infracost/actions/setup@e9d6e6cd65e168e76b0de50ff9957d2fe8bb1832  # v3
         with:
@@ -158,7 +158,7 @@ jobs:
       run:
         working-directory: terraform/live/${{ matrix.environment }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c  # v6.2.3
         with:

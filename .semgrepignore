@@ -1,0 +1,5 @@
+# redteam/attacks/* are deliberately-insecure manifests (privileged pods,
+# hostPath, host namespaces) used by the red-team validation track. They are
+# attack fixtures, not shipped config, so they are excluded from SAST rather
+# than "fixed". Everything else is fixed or suppressed inline.
+redteam/
