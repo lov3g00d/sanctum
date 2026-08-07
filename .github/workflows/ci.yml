@@ -92,6 +92,12 @@ jobs:
   sca-secrets:
     name: sca + secrets (trivy fs, gitleaks)
     runs-on: ubuntu-latest
+    # gitleaks-action reads the PR's commit list via the API on pull_request runs,
+    # which the top-level contents:read default does not cover. A job-scoped grant
+    # keeps every other job read-only.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
