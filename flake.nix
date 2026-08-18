@@ -42,6 +42,9 @@
             kubernetes-helm
             kustomize
             trivy
+            kind      # local Kubernetes for the kind-kafka chamber
+            kcat      # Kafka producer/consumer CLI
+            go-task   # task runner (Taskfile)
 
             # Supply-chain security
             cosign

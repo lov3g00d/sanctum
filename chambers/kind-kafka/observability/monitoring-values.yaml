@@ -1,0 +1,49 @@
+# kube-prometheus-stack trimmed to a Kafka-focused footprint on kind:
+# non-Kafka scrapers, default k8s dashboards and alert rules are turned off.
+# The two *SelectorNilUsesHelmValues=false flags let Prometheus scrape Strimzi's
+# PodMonitor, which is not labelled with this release name.
+alertmanager:
+  enabled: false
+nodeExporter:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+defaultRules:
+  create: false
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
+coreDns:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    evaluationInterval: 15s
+    scrapeInterval: 15s
+    retention: 2h
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+grafana:
+  adminPassword: admin
+  defaultDashboardsEnabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 384Mi

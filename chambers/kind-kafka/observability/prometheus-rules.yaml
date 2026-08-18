@@ -1,0 +1,49 @@
+# Kafka alert rules for the metrics this chamber collects. The Prometheus
+# Operator adopts any PrometheusRule (ruleSelectorNilUsesHelmValues=false in the
+# stack values). Alerts show in the Prometheus UI under Alerts; with Alertmanager
+# disabled they do not route anywhere, which is enough to demonstrate evaluation.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kafka-alerts
+  labels:
+    app: strimzi
+    release: monitoring
+spec:
+  groups:
+    - name: kafka.rules
+      interval: 15s
+      rules:
+        - alert: UnderReplicatedPartitions
+          expr: kafka_server_replicamanager_underreplicatedpartitions > 0
+          for: 15s
+          labels:
+            severity: warning
+          annotations:
+            summary: "Under-replicated partitions on {{ $labels.kubernetes_pod_name }}"
+            description: "A broker is behind or down; some partitions have fewer in-sync replicas than their replication factor."
+        - alert: UnderMinIsrPartitionCount
+          expr: kafka_server_replicamanager_underminisrpartitioncount > 0
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: "Partitions below min.insync.replicas"
+            description: "Partitions have fewer in-sync replicas than min.insync.replicas; producers with acks=all will be rejected."
+        - alert: AbnormalControllerState
+          expr: sum(kafka_controller_kafkacontroller_activecontrollercount) by (namespace) != 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "KRaft controller count is not exactly 1"
+            description: "The active controller count should be exactly 1; a different value means a controller quorum problem."
+        - alert: HighConsumerGroupLag
+          expr: kafka_consumergroup_lag > 1000
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Consumer group {{ $labels.consumergroup }} lag over 1000"
+            description: "Consumers are falling behind producers on {{ $labels.topic }}; scale consumers or investigate."

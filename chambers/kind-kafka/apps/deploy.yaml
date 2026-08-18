@@ -1,0 +1,98 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  labels:
+    app: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+        - name: app
+          image: python:3.12-slim
+          command: ["sh", "-c", "pip install --quiet --no-cache-dir 'confluent-kafka[json]' && exec python /app/producer.py"]
+          env:
+            - name: BOOTSTRAP
+              value: sanctum-kafka-bootstrap:9092
+            - name: SCHEMA_REGISTRY_URL
+              value: http://apicurio-registry:8080/apis/ccompat/v7
+            - name: TOPIC
+              value: demo
+            - name: KAFKA_USER
+              value: producer
+            - name: KAFKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: producer
+                  key: password
+          volumeMounts:
+            - name: app
+              mountPath: /app
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              memory: 192Mi
+      volumes:
+        - name: app
+          configMap:
+            name: kafka-apps
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer
+  labels:
+    app: consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+    spec:
+      containers:
+        - name: app
+          image: python:3.12-slim
+          command: ["sh", "-c", "pip install --quiet --no-cache-dir 'confluent-kafka[json]' && exec python /app/consumer.py"]
+          env:
+            - name: BOOTSTRAP
+              value: sanctum-kafka-bootstrap:9092
+            - name: SCHEMA_REGISTRY_URL
+              value: http://apicurio-registry:8080/apis/ccompat/v7
+            - name: TOPIC
+              value: demo
+            - name: GROUP
+              value: app
+            - name: KAFKA_USER
+              value: consumer
+            - name: KAFKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: consumer
+                  key: password
+          volumeMounts:
+            - name: app
+              mountPath: /app
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              memory: 192Mi
+      volumes:
+        - name: app
+          configMap:
+            name: kafka-apps

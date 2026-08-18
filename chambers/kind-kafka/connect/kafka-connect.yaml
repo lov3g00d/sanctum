@@ -1,0 +1,44 @@
+# Kafka Connect worker. Uses the locally built image (spec.image) with the
+# Debezium JDBC sink, authenticates to Kafka as the connect user, and defaults
+# to the JSON converter with schemas enabled so the sink gets a schema to build
+# the target table from. The use-connector-resources annotation lets connectors
+# be declared as KafkaConnector custom resources.
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaConnect
+metadata:
+  name: connect
+  annotations:
+    strimzi.io/use-connector-resources: "true"
+spec:
+  version: 4.3.0
+  replicas: 1
+  bootstrapServers: sanctum-kafka-bootstrap:9092
+  image: sanctum-connect:jdbc
+  groupId: connect-cluster
+  configStorageTopic: connect-cluster-configs
+  offsetStorageTopic: connect-cluster-offsets
+  statusStorageTopic: connect-cluster-status
+  authentication:
+    type: scram-sha-512
+    username: connect
+    passwordSecret:
+      secretName: connect
+      password: password
+  config:
+    config.storage.replication.factor: 3
+    offset.storage.replication.factor: 3
+    status.storage.replication.factor: 3
+    key.converter: org.apache.kafka.connect.json.JsonConverter
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    key.converter.schemas.enable: false
+    value.converter.schemas.enable: true
+  jvmOptions:
+    -Xms: 512m
+    -Xmx: 1280m
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      memory: 2Gi

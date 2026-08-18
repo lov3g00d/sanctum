@@ -1,0 +1,161 @@
+version: '3'
+
+vars:
+  NS: kafka
+  KIND_CLUSTER: sanctum-kafka
+  STRIMZI_VERSION: 1.1.0
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: kind + Strimzi operator + Kafka
+    cmds:
+      - task: kind-up
+      - task: operator
+      - task: deploy
+      - task: wait
+      - 'echo "Kafka is up. Try:  task smoke   |   tear down:  task down"'
+
+  kind-up:
+    desc: Create the kind cluster (skips if it exists)
+    status:
+      - kind get clusters | grep -qx {{.KIND_CLUSTER}}
+    cmds:
+      - kind create cluster --config kind/cluster.yaml
+
+  operator:
+    desc: Install the Strimzi cluster operator (community Helm chart)
+    cmds:
+      - helm repo add strimzi https://strimzi.io/charts/ 2>/dev/null || true
+      - helm repo update strimzi
+      - >-
+        helm upgrade --install strimzi strimzi/strimzi-kafka-operator
+        --namespace {{.NS}} --create-namespace --version {{.STRIMZI_VERSION}} --wait
+
+  deploy:
+    desc: Apply the Kafka manifest and its metrics config
+    cmds:
+      - kubectl -n {{.NS}} apply -f cluster/metrics.yaml
+      - kubectl -n {{.NS}} apply -f cluster/kafka.yaml
+
+  wait:
+    desc: Wait for Kafka to be Ready
+    cmds:
+      - kubectl -n {{.NS}} wait --for=condition=Ready kafka/sanctum --timeout=300s
+      - kubectl -n {{.NS}} wait --for=condition=Ready kafkatopic --all --timeout=120s
+
+  smoke:
+    desc: Produce and consume on the demo topic
+    cmds:
+      - bash scripts/demo/smoke.sh
+
+  ha:
+    desc: Prove a broker can die with no data loss
+    cmds:
+      - bash scripts/demo/ha.sh
+
+  authz:
+    desc: Show ACL enforcement - each user can do only what its ACLs allow
+    cmds:
+      - bash scripts/demo/authz.sh
+
+  tls:
+    desc: Produce/consume over the TLS listener with mutual TLS (cert identity)
+    cmds:
+      - bash scripts/demo/tls.sh
+
+  groups:
+    desc: Scale the consumer group and watch partitions rebalance across members
+    cmds:
+      - bash scripts/demo/groups.sh
+
+  schema:
+    desc: Show the schema contract rejecting bad messages at the producer
+    cmds:
+      - bash scripts/demo/schema.sh
+
+  evolution:
+    desc: Evolve the schema - compatible change versioned, breaking change refused
+    cmds:
+      - bash scripts/demo/evolution.sh
+
+  alerts:
+    desc: Kill a broker and watch UnderReplicatedPartitions fire then resolve
+    cmds:
+      - bash scripts/demo/alerts.sh
+
+  dlq:
+    desc: Send a poison message and watch the consumer route it to the dead-letter topic
+    cmds:
+      - bash scripts/demo/dlq.sh
+
+  sink:
+    desc: Sink a JSON topic into Postgres via Kafka Connect (no application code)
+    cmds:
+      - bash scripts/demo/sink.sh
+
+  cdc:
+    desc: Change a row in Postgres and watch Debezium capture it into Kafka
+    cmds:
+      - bash scripts/demo/cdc.sh
+
+  registry:
+    desc: Deploy the Apicurio schema registry (Confluent-compatible API)
+    cmds:
+      - kubectl -n {{.NS}} apply -f registry/registry.yaml
+      - kubectl -n {{.NS}} rollout status deploy/apicurio-registry --timeout=180s
+
+  monitoring:
+    desc: Install Prometheus + Grafana and scrape the Kafka metrics
+    cmds:
+      - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+      - helm repo update prometheus-community
+      - helm upgrade --install monitoring prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace --version 88.3.0 -f observability/monitoring-values.yaml --wait --timeout 8m
+      - kubectl -n {{.NS}} apply -f observability/pod-monitors.yaml
+      - kubectl -n monitoring apply -f observability/prometheus-rules.yaml
+      - kubectl -n monitoring create configmap strimzi-dashboards --from-file=observability/dashboards/ --dry-run=client -o yaml | kubectl -n monitoring apply -f -
+      - kubectl -n monitoring label configmap strimzi-dashboards grafana_dashboard=1 --overwrite
+
+  grafana:
+    desc: Port-forward Grafana at http://localhost:3000 (admin/admin)
+    cmds:
+      - 'echo "Grafana: http://localhost:3000  (admin / admin)"'
+      - kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+
+  apps:
+    desc: Deploy the producer and consumer apps (each as its least-privilege user)
+    cmds:
+      - kubectl -n {{.NS}} create configmap kafka-apps --from-file=apps/producer.py --from-file=apps/consumer.py --dry-run=client -o yaml | kubectl -n {{.NS}} apply -f -
+      - kubectl -n {{.NS}} apply -f apps/deploy.yaml
+      - kubectl -n {{.NS}} rollout status deploy/producer --timeout=180s
+      - kubectl -n {{.NS}} rollout status deploy/consumer --timeout=180s
+
+  connect:
+    desc: Build the Connect image, load it into kind, deploy Postgres + Kafka Connect
+    cmds:
+      - docker build -t sanctum-connect:jdbc connect/
+      - kind load docker-image sanctum-connect:jdbc --name {{.KIND_CLUSTER}}
+      - kubectl -n {{.NS}} apply -f connect/postgres.yaml
+      - kubectl -n {{.NS}} apply -f connect/kafka-connect.yaml
+      - kubectl -n {{.NS}} rollout status deploy/postgres --timeout=120s
+      - kubectl -n {{.NS}} wait --for=condition=Ready kafkaconnect/connect --timeout=360s
+      - kubectl -n {{.NS}} apply -f connect/connector.yaml
+      - kubectl -n {{.NS}} wait --for=condition=Ready kafkaconnector/orders-sink --timeout=120s
+
+  apps-logs:
+    desc: Follow the consumer app (watch it consume what the producer sends)
+    cmds:
+      - kubectl -n {{.NS}} logs -f deploy/consumer
+
+  status:
+    desc: Show the Kafka resources
+    cmds:
+      - kubectl -n {{.NS}} get kafka,kafkanodepool,kafkatopic,pods
+
+  down:
+    desc: Delete the whole kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}}

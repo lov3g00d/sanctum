@@ -1,0 +1,22 @@
+# The Debezium JDBC sink connector: reads connect-orders and writes each record
+# to the orders table in Postgres, creating the table from the record's schema
+# (schema.evolution: basic). No application code involved.
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaConnector
+metadata:
+  name: orders-sink
+  labels:
+    strimzi.io/cluster: connect
+spec:
+  class: io.debezium.connector.jdbc.JdbcSinkConnector
+  tasksMax: 1
+  config:
+    topics: connect-orders
+    connection.url: jdbc:postgresql://postgres:5432/orders
+    connection.username: connect
+    connection.password: connect
+    insert.mode: insert
+    primary.key.mode: none
+    schema.evolution: basic
+    table.name.format: orders

@@ -1,0 +1,60 @@
+# Apicurio Registry: the schema store that governs the topic's data contract.
+# In-memory storage (default) - schemas do not survive a restart, which is fine
+# for a learning chamber. The Confluent-compatible API lives under /apis/ccompat/v7.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apicurio-registry
+  labels:
+    app: apicurio-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apicurio-registry
+  template:
+    metadata:
+      labels:
+        app: apicurio-registry
+    spec:
+      containers:
+        - name: registry
+          image: apicurio/apicurio-registry:3.3.1
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 400Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apicurio-registry
+  labels:
+    app: apicurio-registry
+spec:
+  selector:
+    app: apicurio-registry
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

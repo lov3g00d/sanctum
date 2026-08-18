@@ -1,0 +1,5 @@
+# Single node: local kind demonstrates broker-level HA; node/AZ-level HA is a
+# cloud concern (the aws-eks chamber). Cross-node pod DNS is flaky on kind.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: sanctum-kafka
