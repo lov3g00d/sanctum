@@ -56,3 +56,9 @@ port-forward needed.
   production values.
 - The operator pattern: `ServiceMonitor` for scraping, `PrometheusRule` for
   SLOs, declarative HA Prometheus.
+
+## Reference
+
+[`prometheus.md`](prometheus.md) is a deep-dive on how Prometheus works
+internally (data model, scrape lifecycle, TSDB, PromQL, rules, cardinality,
+scaling), grounded in this chamber.

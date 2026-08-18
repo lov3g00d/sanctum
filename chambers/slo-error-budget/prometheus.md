@@ -2,12 +2,12 @@
 
 How Prometheus actually works, at the level that separates people who install
 `kube-prometheus-stack` from people who can debug why a target is `up` but has no
-data, or why p99 latency reads 1s when it is really 3s. Grounded in two Sanctum
-chambers: [`slo-error-budget`](../chambers/slo-error-budget/) (the app metric
-`http_requests_total`, SLI recording rules, and the burn-rate alert) and
-[`kind-kafka`](../chambers/kind-kafka/) (the same stack scraping Strimzi via
-`ServiceMonitor`). See also [observability](observability.md) for how this is
-delivered in the aws-eks platform.
+data, or why p99 latency reads 1s when it is really 3s. Grounded in this chamber
+(the app metric `http_requests_total`, the SLI recording rules in
+[`k8s/slo-rules.yaml`](k8s/slo-rules.yaml), and the burn-rate alert) and in
+[`kind-kafka`](../kind-kafka/) (the same stack scraping Strimzi via a
+`ServiceMonitor`). See also [observability](../../docs/observability.md) for how
+this is delivered in the aws-eks platform.
 
 ## The one idea
 
