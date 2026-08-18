@@ -1,0 +1,73 @@
+# Prod-shaped kube-prometheus-stack for an SLO lab: HA Prometheus with
+# persistent TSDB and real resource requests, discovering ServiceMonitors and
+# PrometheusRules across all namespaces. The cluster-infra scrapers are off to
+# keep the focus on the app SLO (they would be on in a real cluster).
+defaultRules:
+  create: false
+nodeExporter:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+kubelet:
+  enabled: false
+kubeApiServer:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
+coreDns:
+  enabled: false
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30909
+  prometheusSpec:
+    replicas: 2
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    retention: 7d
+    # discover monitors and rules in every namespace, regardless of labels
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+grafana:
+  adminPassword: admin
+  service:
+    type: NodePort
+    nodePort: 30300
+  defaultDashboardsEnabled: false

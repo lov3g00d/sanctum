@@ -15,6 +15,7 @@ pieces they draw on. It is built for practice and prototyping, not as a product.
 |---------|-----------|
 | [`aws-eks`](chambers/aws-eks/) | AWS EKS platform: Terraform + Terragrunt to VPC/EKS/RDS, a full Helm addon layer (Cilium, ArgoCD, observability, security), GitOps delivery, and CI/CD |
 | [`kind-kafka`](chambers/kind-kafka/) | Local Kafka on kind + Strimzi (operator via its community Helm chart) |
+| [`slo-error-budget`](chambers/slo-error-budget/) | SLO practice on kind: an app with tunable failure, HA Prometheus (kube-prometheus-stack), SLIs, error budgets, and multi-window burn-rate alerts |
 
 Each chamber is self-contained, with its own README covering prerequisites, stand-up,
 tear-down, and what it demonstrates. Adding one is additive: a new environment is a new

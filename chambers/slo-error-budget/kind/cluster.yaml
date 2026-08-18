@@ -1,0 +1,12 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: slo
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30300
+        hostPort: 13000
+        protocol: TCP
+      - containerPort: 30909
+        hostPort: 19090
+        protocol: TCP

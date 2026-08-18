@@ -1,0 +1,79 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slo-app
+  namespace: slo
+  labels:
+    app: slo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slo-app
+  template:
+    metadata:
+      labels:
+        app: slo-app
+    spec:
+      containers:
+        - name: app
+          image: slo-app:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slo-app
+  namespace: slo
+  labels:
+    app: slo-app
+spec:
+  selector:
+    app: slo-app
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: slo-app
+  namespace: slo
+  labels:
+    app: slo-app
+spec:
+  selector:
+    matchLabels:
+      app: slo-app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

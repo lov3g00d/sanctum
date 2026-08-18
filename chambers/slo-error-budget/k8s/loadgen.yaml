@@ -1,0 +1,62 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loadgen
+  namespace: slo
+data:
+  loadgen.py: |
+    import os
+    import time
+    import urllib.request
+
+    URL = os.environ.get("TARGET", "http://slo-app:8080/")
+    RPS = float(os.environ.get("RPS", "20"))
+    interval = 1.0 / RPS
+
+    while True:
+        try:
+            urllib.request.urlopen(URL, timeout=5).read()
+        except Exception:
+            pass
+        time.sleep(interval)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: slo
+  labels:
+    app: loadgen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen
+  template:
+    metadata:
+      labels:
+        app: loadgen
+    spec:
+      containers:
+        - name: loadgen
+          image: python:3.12-slim
+          command: ["python", "/app/loadgen.py"]
+          env:
+            - name: TARGET
+              value: http://slo-app:8080/
+            - name: RPS
+              value: "20"
+          volumeMounts:
+            - name: script
+              mountPath: /app
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: script
+          configMap:
+            name: loadgen

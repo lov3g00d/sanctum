@@ -1,0 +1,46 @@
+# SLO recording rules and multi-window burn-rate alerts as a PrometheusRule CR.
+# Availability SLO = 99%; error budget = 1%. Burn rate = error ratio / budget.
+# Windows are lab-compressed (1m/5m/30m) so the demo fires in minutes; production
+# uses 5m/1h and 30m/6h against a 30-day SLO window.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-availability
+  namespace: slo
+  labels:
+    app: slo-app
+spec:
+  groups:
+    - name: slo.sli
+      rules:
+        - record: sli:availability:ratio_rate5m
+          expr: sum(rate(http_requests_total{status!~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
+        - record: sli:latency:ratio_rate5m
+          expr: sum(rate(http_request_duration_seconds_bucket{le="0.2"}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))
+        - record: slo:error_ratio:rate1m
+          expr: sum(rate(http_requests_total{status=~"5.."}[1m])) / sum(rate(http_requests_total[1m]))
+        - record: slo:error_ratio:rate5m
+          expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
+        - record: slo:error_ratio:rate30m
+          expr: sum(rate(http_requests_total{status=~"5.."}[30m])) / sum(rate(http_requests_total[30m]))
+    - name: slo.alerts
+      rules:
+        - alert: ErrorBudgetBurnFast
+          expr: (slo:error_ratio:rate5m / 0.01) > 14.4 and (slo:error_ratio:rate1m / 0.01) > 14.4
+          for: 1m
+          labels:
+            severity: page
+            slo: availability
+          annotations:
+            summary: "Fast error-budget burn (>14.4x) on the availability SLO"
+            description: "Burning the 99% availability budget 14.4x too fast; a 30-day budget is gone in ~2 days. Page."
+        - alert: ErrorBudgetBurnSlow
+          expr: (slo:error_ratio:rate30m / 0.01) > 6 and (slo:error_ratio:rate5m / 0.01) > 6
+          for: 2m
+          labels:
+            severity: ticket
+            slo: availability
+          annotations:
+            summary: "Slow error-budget burn (>6x) on the availability SLO"
+            description: "Sustained elevated error rate depleting the availability error budget. Open a ticket."

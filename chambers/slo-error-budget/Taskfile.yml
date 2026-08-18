@@ -1,0 +1,84 @@
+version: '3'
+
+vars:
+  KIND_CLUSTER: slo
+  NS: slo
+  PROM: http://localhost:19090
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: kind + kube-prometheus-stack (HA) + the SLO app, load generator and rules
+    cmds:
+      - task: kind-up
+      - task: image
+      - task: monitoring
+      - task: deploy
+      - 'echo "up. grafana=http://localhost:13000 (admin/admin)  prometheus=http://localhost:19090"'
+
+  kind-up:
+    desc: Create the kind cluster (skips if it exists)
+    status:
+      - kind get clusters | grep -qx {{.KIND_CLUSTER}}
+    cmds:
+      - kind create cluster --config kind/cluster.yaml
+
+  image:
+    desc: Build the app image and load it into kind
+    cmds:
+      - docker build -t slo-app:dev app/
+      - kind load docker-image slo-app:dev --name {{.KIND_CLUSTER}}
+
+  monitoring:
+    desc: Install kube-prometheus-stack (HA Prometheus, persistent TSDB)
+    cmds:
+      - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+      - helm repo update prometheus-community
+      - >-
+        helm upgrade --install monitoring prometheus-community/kube-prometheus-stack
+        --namespace monitoring --create-namespace --version 88.3.0
+        -f monitoring-values.yaml --wait --timeout 8m
+
+  deploy:
+    desc: Deploy the app, load generator, SLO rules and dashboard
+    cmds:
+      - kubectl apply -f k8s/app.yaml
+      - kubectl apply -f k8s/loadgen.yaml
+      - kubectl apply -f k8s/slo-rules.yaml
+      - kubectl -n monitoring create configmap slo-dashboard --from-file=grafana/dashboards/slo.json --dry-run=client -o yaml | kubectl -n monitoring apply -f -
+      - kubectl -n monitoring label configmap slo-dashboard grafana_dashboard=1 --overwrite
+      - kubectl -n {{.NS}} rollout status deploy/slo-app --timeout=120s
+      - kubectl -n {{.NS}} rollout status deploy/loadgen --timeout=120s
+
+  status:
+    desc: Current availability SLI and error-budget burn rate
+    silent: true
+    cmds:
+      - |
+        sli=$(curl -s '{{.PROM}}/api/v1/query?query=sli:availability:ratio_rate5m' | jq -r '.data.result[0].value[1] // "n/a"')
+        burn=$(curl -s '{{.PROM}}/api/v1/query?query=slo:error_ratio:rate5m/0.01' | jq -r '.data.result[0].value[1] // "0"')
+        echo "availability SLI (5m): $sli   (SLO target 0.99)"
+        echo "burn rate (5m):        ${burn}x   (page at 14.4x, ticket at 6x)"
+
+  break:
+    desc: Inject 50% errors to burn the error budget
+    cmds:
+      - kubectl -n {{.NS}} exec deploy/slo-app -- python -c "import urllib.request; print(urllib.request.urlopen(urllib.request.Request('http://localhost:8080/config?error_rate=0.5', method='POST')).read().decode())"
+
+  heal:
+    desc: Stop injecting errors
+    cmds:
+      - kubectl -n {{.NS}} exec deploy/slo-app -- python -c "import urllib.request; print(urllib.request.urlopen(urllib.request.Request('http://localhost:8080/config?error_rate=0', method='POST')).read().decode())"
+
+  burn-demo:
+    desc: Break the SLI, wait for the burn-rate alert to fire, then heal
+    cmds:
+      - bash scripts/burn-demo.sh
+
+  down:
+    desc: Delete the kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}}
