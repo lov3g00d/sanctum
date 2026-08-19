@@ -1,0 +1,58 @@
+# STRICT mTLS for the web namespace: workloads only accept mutual-TLS traffic
+# from other sidecars. The mesh-client has a sidecar (its calls are mTLS); the
+# plain-client opts out of injection (its plaintext calls are rejected).
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: web
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mesh-client
+  namespace: web
+  labels:
+    app: mesh-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mesh-client
+  template:
+    metadata:
+      labels:
+        app: mesh-client
+    spec:
+      containers:
+        - name: curl
+          image: curlimages/curl:latest
+          command: ["sleep", "infinity"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plain-client
+  namespace: web
+  labels:
+    app: plain-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plain-client
+  template:
+    metadata:
+      labels:
+        app: plain-client
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: curl
+          image: curlimages/curl:latest
+          command: ["sleep", "infinity"]

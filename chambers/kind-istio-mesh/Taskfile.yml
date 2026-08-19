@@ -1,0 +1,89 @@
+version: '3'
+
+vars:
+  KIND_CLUSTER: istio
+  NS: web
+  ISTIO_VERSION: 1.30.3
+  GW: http://localhost:18081
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: kind + Istio + the web app (v1/v2), routing and mTLS
+    cmds:
+      - task: kind-up
+      - task: image
+      - task: istio
+      - task: deploy
+      - 'echo "up. ingress: {{.GW}}/   (curl it to see which version serves)"'
+
+  kind-up:
+    desc: Create the kind cluster (skips if it exists)
+    status:
+      - kind get clusters | grep -qx {{.KIND_CLUSTER}}
+    cmds:
+      - kind create cluster --config kind/cluster.yaml
+
+  image:
+    desc: Build the web image and load it into kind
+    cmds:
+      - docker build -t web:dev app/
+      - kind load docker-image web:dev --name {{.KIND_CLUSTER}}
+
+  istio:
+    desc: Install Istio (base + istiod + ingress gateway) via the official Helm charts
+    cmds:
+      - helm repo add istio https://istio-release.storage.googleapis.com/charts 2>/dev/null || true
+      - helm repo update istio
+      - helm upgrade --install istio-base istio/base -n istio-system --create-namespace --version {{.ISTIO_VERSION}} --set defaultRevision=default --wait
+      - helm upgrade --install istiod istio/istiod -n istio-system --version {{.ISTIO_VERSION}} --wait
+      - kubectl create namespace istio-ingress --dry-run=client -o yaml | kubectl apply -f -
+      - helm upgrade --install istio-ingressgateway istio/gateway -n istio-ingress --version {{.ISTIO_VERSION}} -f istio-ingress-values.yaml --wait
+
+  deploy:
+    desc: Deploy the app, routing (Gateway/VirtualService/DestinationRule) and STRICT mTLS
+    cmds:
+      - kubectl apply -f k8s/app.yaml
+      - kubectl apply -f k8s/routing.yaml
+      - kubectl apply -f k8s/mtls.yaml
+      - kubectl -n {{.NS}} rollout status deploy/web-v1 --timeout=120s
+      - kubectl -n {{.NS}} rollout status deploy/web-v2 --timeout=120s
+      - kubectl -n {{.NS}} rollout status deploy/mesh-client --timeout=120s
+
+  status:
+    desc: Show the current traffic split and the sidecar count
+    silent: true
+    cmds:
+      - |
+        echo -n "VirtualService weights:  "
+        kubectl -n {{.NS}} get virtualservice web -o jsonpath='{range .spec.http[0].route[*]}{.destination.subset}={.weight}%  {end}{"\n"}'
+        echo "sidecars (2/2 = app + istio-proxy):"
+        kubectl -n {{.NS}} get pods -l app=web --no-headers | awk '{print "  "$1"  "$2}'
+
+  canary:
+    desc: Gradually shift traffic v1 -> v2 (10, 50, 100) and count responses
+    cmds:
+      - bash scripts/canary.sh
+
+  bluegreen:
+    desc: Flip all traffic v1 -> v2 in one step, then back
+    cmds:
+      - bash scripts/bluegreen.sh
+
+  mtls-demo:
+    desc: Show STRICT mTLS accept a meshed client and reject a plaintext one
+    cmds:
+      - bash scripts/mtls-demo.sh
+
+  reset:
+    desc: Route 100% back to v1
+    cmds:
+      - kubectl -n {{.NS}} patch virtualservice web --type=json -p='[{"op":"replace","path":"/spec/http/0/route/0/weight","value":100},{"op":"replace","path":"/spec/http/0/route/1/weight","value":0}]'
+
+  down:
+    desc: Delete the kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}}
