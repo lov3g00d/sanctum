@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icinga - the check-and-notify stack</title>
+<style>
+  :root {
+    --bg: #f6f6f9;
+    --panel: #ffffff;
+    --panel-2: #f0f0f4;
+    --ink: #17171f;
+    --ink-soft: #55555f;
+    --line: #e2e2ea;
+    --accent: #e5308a;
+    --accent-soft: #fce4f0;
+    --ok: #1f9d57;
+    --warn: #c98a00;
+    --crit: #d63b3f;
+    --unknown: #7c7c88;
+    --engine: #e5308a;
+    --store: #0e8f9e;
+    --ui: #6a4bd6;
+    --k8s: #2563c9;
+    --mono: "JetBrains Mono", "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f0f15;
+      --panel: #17171f;
+      --panel-2: #1e1e28;
+      --ink: #e9e9f0;
+      --ink-soft: #a0a0ad;
+      --line: #2a2a36;
+      --accent: #ff5aa6;
+      --accent-soft: #2a0f1e;
+      --ok: #35c07a;
+      --warn: #e0a83a;
+      --crit: #f0595d;
+      --unknown: #9a9aa6;
+      --engine: #ff5aa6;
+      --store: #2bc0d0;
+      --ui: #9d86ff;
+      --k8s: #5a9bff;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f6f9; --panel: #ffffff; --panel-2: #f0f0f4; --ink: #17171f; --ink-soft: #55555f;
+    --line: #e2e2ea; --accent: #e5308a; --accent-soft: #fce4f0; --ok: #1f9d57; --warn: #c98a00;
+    --crit: #d63b3f; --unknown: #7c7c88; --engine: #e5308a; --store: #0e8f9e; --ui: #6a4bd6; --k8s: #2563c9;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f0f15; --panel: #17171f; --panel-2: #1e1e28; --ink: #e9e9f0; --ink-soft: #a0a0ad;
+    --line: #2a2a36; --accent: #ff5aa6; --accent-soft: #2a0f1e; --ok: #35c07a; --warn: #e0a83a;
+    --crit: #f0595d; --unknown: #9a9aa6; --engine: #ff5aa6; --store: #2bc0d0; --ui: #9d86ff; --k8s: #5a9bff;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-family: var(--mono); font-weight: 700; font-size: clamp(28px, 5vw, 44px);
+    line-height: 1.05; margin: 0 0 14px; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { font-family: var(--mono); font-size: 20px; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .lead { font-size: 18px; color: var(--ink-soft); max-width: 64ch; margin: 0 0 8px; }
+  section { margin-top: 56px; }
+  .sec-head { border-top: 1px solid var(--line); padding-top: 28px; margin-bottom: 22px; }
+  .sec-head .eyebrow { color: var(--ink-soft); }
+  .sec-head p { margin: 6px 0 0; color: var(--ink-soft); max-width: 68ch; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.9em; }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .chip { font-family: var(--mono); font-size: 12px; display: inline-flex; align-items: center;
+    gap: 7px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .d-ok { background: var(--ok); } .d-warn { background: var(--warn); }
+  .d-crit { background: var(--crit); } .d-unknown { background: var(--unknown); }
+
+  /* callout */
+  .callout { background: var(--accent-soft); border: 1px solid var(--line);
+    border-left: 3px solid var(--accent); border-radius: 12px; padding: 20px 22px; margin-top: 24px; }
+  .callout strong { color: var(--accent); }
+
+  /* cards */
+  .grid { display: grid; gap: 14px; }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 780px) { .cols-3, .cols-2 { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .card .tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; display: inline-block; margin-bottom: 10px; }
+  .t-engine { color: var(--engine); background: color-mix(in srgb, var(--engine) 12%, transparent); }
+  .t-store { color: var(--store); background: color-mix(in srgb, var(--store) 14%, transparent); }
+  .t-ui { color: var(--ui); background: color-mix(in srgb, var(--ui) 14%, transparent); }
+  .t-k8s { color: var(--k8s); background: color-mix(in srgb, var(--k8s) 14%, transparent); }
+  .t-obj { color: var(--ink-soft); background: var(--panel-2); }
+  .card h3 { font-family: var(--mono); font-size: 15px; margin: 0 0 6px; }
+  .card p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .card .meta { font-family: var(--mono); font-size: 11px; color: var(--ink-soft); margin-top: 10px;
+    padding-top: 10px; border-top: 1px dashed var(--line); }
+
+  /* flow diagram */
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin-top: 8px; }
+  .node { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; min-width: 120px; text-align: center; flex: 1; }
+  .node .n-name { font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  .node .n-sub { font-size: 11px; color: var(--ink-soft); }
+  .node.engine { border-color: var(--engine); }
+  .node.store { border-color: var(--store); }
+  .node.ui { border-color: var(--ui); }
+  .arrow { align-self: center; padding: 0 10px; color: var(--accent); font-family: var(--mono);
+    font-size: 13px; white-space: nowrap; }
+  .arrow small { display: block; color: var(--ink-soft); font-size: 9px; letter-spacing: 0.06em; }
+  @media (max-width: 780px) {
+    .flow { flex-direction: column; }
+    .arrow { transform: rotate(90deg); padding: 8px 0; }
+  }
+
+  /* state machine */
+  .states { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 8px; }
+  .state-box { border-radius: 10px; padding: 12px 14px; border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 13px; background: var(--panel); }
+  .state-box b { display: block; font-size: 11px; letter-spacing: 0.08em; }
+  .sb-ok { border-color: var(--ok); } .sb-soft { border-color: var(--warn); }
+  .sb-hard { border-color: var(--crit); }
+
+  /* table */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-soft); background: var(--panel-2); }
+  tr:last-child td { border-bottom: none; }
+  td .mono { color: var(--ink); }
+  .exit { font-family: var(--mono); font-weight: 700; }
+
+  /* two-lane compare */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 780px) { .compare { grid-template-columns: 1fr; } }
+  .lane { border: 1px solid var(--line); border-radius: 12px; padding: 18px; background: var(--panel); }
+  .lane h3 { font-family: var(--mono); font-size: 15px; margin: 0 0 12px; }
+  .lane ul { margin: 0; padding-left: 18px; }
+  .lane li { font-size: 14px; color: var(--ink-soft); margin-bottom: 7px; }
+  .lane.icinga { border-top: 3px solid var(--accent); }
+  .lane.prom { border-top: 3px solid var(--k8s); }
+
+  /* pipeline gates */
+  .gates { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .gate { font-family: var(--mono); font-size: 12px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 12px; position: relative; }
+  .gate::after { content: "\2192"; color: var(--accent); margin-left: 10px; }
+  .gate:last-child::after { content: ""; }
+
+  footer { margin-top: 64px; border-top: 1px solid var(--line); padding-top: 22px;
+    font-size: 13px; color: var(--ink-soft); }
+  footer code { font-size: 12px; }
+  .theme-toggle { position: fixed; top: 14px; right: 14px; font-family: var(--mono); font-size: 11px;
+    background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft); border-radius: 999px;
+    padding: 6px 12px; cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="var r=document.documentElement;var d=(r.getAttribute('data-theme')|| (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));r.setAttribute('data-theme', d==='dark'?'light':'dark');">toggle theme</button>
+<div class="wrap">
+
+  <p class="eyebrow">Monitoring / kind-icinga chamber</p>
+  <h1>Icinga: the check-and-notify stack</h1>
+  <p class="lead">Icinga actively runs a plugin against every host and service on a schedule, turns the plugin's exit code into a state, holds that state until it is stable, and notifies on change. It goes and asks. It does not wait to be told.</p>
+  <div class="legend">
+    <span class="chip"><span class="dot d-ok"></span>OK &middot; exit 0</span>
+    <span class="chip"><span class="dot d-warn"></span>WARNING &middot; exit 1</span>
+    <span class="chip"><span class="dot d-crit"></span>CRITICAL &middot; exit 2</span>
+    <span class="chip"><span class="dot d-unknown"></span>UNKNOWN &middot; exit 3</span>
+  </div>
+
+  <div class="callout">
+    <strong>The one idea.</strong> A monitoring model built on <em>discrete host/service states</em> and <em>notifications on change</em>, driven by an active scheduler. That is the opposite of Prometheus, which scrapes numeric metrics and evaluates alert expressions over a time series. Icinga thinks in states; Prometheus thinks in samples.
+  </div>
+
+  <!-- COMPONENTS -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Services</p>
+      <h2>The components</h2>
+      <p>Six services make up the stack in this chamber. Icinga 2 is the brain; the rest are state, UI, and optional layers. Icinga 2 never writes SQL directly - state flows through Redis and the Icinga DB daemon.</p>
+    </div>
+    <div class="grid cols-3">
+      <div class="card">
+        <span class="tag t-engine">engine</span>
+        <h3>Icinga 2</h3>
+        <p>The core. Holds the object config, schedules and runs checks, computes states, and fires notifications. Exposes a REST API.</p>
+        <div class="meta">StatefulSet &middot; port 5665 (API) &middot; image icinga/icinga2</div>
+      </div>
+      <div class="card">
+        <span class="tag t-store">state relay</span>
+        <h3>Redis (Icinga DB Redis)</h3>
+        <p>The fast hand-off buffer. Icinga 2 writes live runtime state here; the Icinga DB daemon consumes it. Decouples the engine from the SQL write path.</p>
+        <div class="meta">port 6379 &middot; an Icinga-tuned Redis</div>
+      </div>
+      <div class="card">
+        <span class="tag t-store">state daemon</span>
+        <h3>Icinga DB</h3>
+        <p>Reads runtime state from Redis and persists it to MySQL/MariaDB. This Redis-relay design replaced the older direct-to-SQL IDO.</p>
+        <div class="meta">Deployment &middot; image icinga/icingadb</div>
+      </div>
+      <div class="card">
+        <span class="tag t-store">database</span>
+        <h3>MariaDB</h3>
+        <p>Durable store for history, comments, downtimes, and config. The chart runs one instance per database (Icinga DB, Icinga Web, Director, Kubernetes).</p>
+        <div class="meta">port 3306 &middot; one StatefulSet per DB</div>
+      </div>
+      <div class="card">
+        <span class="tag t-ui">web ui</span>
+        <h3>Icinga Web 2</h3>
+        <p>The dashboard. Reads MariaDB (and Redis for live data) to draw hosts, services, problems, and history. Modular: Director, Icinga DB, Kubernetes are modules.</p>
+        <div class="meta">port 8080 &middot; here on http://localhost:18082</div>
+      </div>
+      <div class="card">
+        <span class="tag t-k8s">k8s collector</span>
+        <h3>Icinga for Kubernetes</h3>
+        <p>A separate daemon that watches the Kubernetes API and syncs resource state (pods, deployments, nodes) into a database for the Kubernetes web module. Complements checks; it does not replace them.</p>
+        <div class="meta">Deployment &middot; image icinga/icinga-kubernetes</div>
+      </div>
+    </div>
+    <div class="grid cols-2" style="margin-top:14px;">
+      <div class="card">
+        <span class="tag t-ui">config module</span>
+        <h3>Icinga Director (optional)</h3>
+        <p>A web module plus its own database for managing config with import/sync from external sources, deployed to Icinga 2 over the API. The right tool at fleet scale; this chamber instead pushes config through the raw API to keep the model transparent.</p>
+        <div class="meta">module of Icinga Web 2 + a MariaDB</div>
+      </div>
+      <div class="card">
+        <span class="tag t-engine">plugins</span>
+        <h3>Monitoring Plugins</h3>
+        <p>The check executables (<code>check_http</code>, <code>check_tcp</code>, <code>check_ping</code>, ...) bundled in the Icinga 2 image under <code>/usr/lib/nagios/plugins</code>. Any program that follows the exit-code contract is a valid check.</p>
+        <div class="meta">the Nagios plugin API</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA FLOW -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Data flow</p>
+      <h2>How state moves</h2>
+      <p>A check result travels from a plugin, through the engine, into Redis, gets persisted by the Icinga DB daemon, and surfaces in the web UI. One direction, clearly staged.</p>
+    </div>
+    <div class="flow">
+      <div class="node engine"><div class="n-name">plugins</div><div class="n-sub">check_http, ...</div></div>
+      <div class="arrow">&#8646;<small>run / exit code</small></div>
+      <div class="node engine"><div class="n-name">Icinga 2</div><div class="n-sub">schedule + state</div></div>
+      <div class="arrow">&#8594;<small>runtime state</small></div>
+      <div class="node store"><div class="n-name">Redis</div><div class="n-sub">relay buffer</div></div>
+      <div class="arrow">&#8594;<small>consume</small></div>
+      <div class="node store"><div class="n-name">Icinga DB</div><div class="n-sub">persist</div></div>
+      <div class="arrow">&#8594;<small>SQL</small></div>
+      <div class="node store"><div class="n-name">MariaDB</div><div class="n-sub">history</div></div>
+      <div class="arrow">&#8594;<small>read</small></div>
+      <div class="node ui"><div class="n-name">Icinga Web 2</div><div class="n-sub">UI</div></div>
+    </div>
+  </section>
+
+  <!-- OBJECT MODEL -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Concepts</p>
+      <h2>The object model</h2>
+      <p>Everything in Icinga is a typed object in declarative config. These are the ones you actually write. <code>apply</code> rules are the scaling lever: describe a thousand hosts' checks in a few rules with an <code>assign where</code> expression.</p>
+    </div>
+    <div class="grid cols-3">
+      <div class="card"><span class="tag t-obj">object</span><h3>Host</h3><p>A monitored machine or endpoint. Has an <code>address</code> and its own check. Top of the dependency tree; groups services.</p></div>
+      <div class="card"><span class="tag t-obj">object</span><h3>Service</h3><p>A specific check on a host. Carries the <code>check_command</code> and scheduling knobs. Where "is /healthz OK?" lives.</p></div>
+      <div class="card"><span class="tag t-obj">command</span><h3>CheckCommand</h3><p>How to run a plugin: the executable plus how arguments map to <code>vars.*</code>. Ships in the Icinga Template Library (ITL).</p></div>
+      <div class="card"><span class="tag t-obj">object</span><h3>TimePeriod</h3><p>When checks or notifications are active (e.g. <code>24x7</code>). Must be defined explicitly when <code>conf.d</code> is disabled.</p></div>
+      <div class="card"><span class="tag t-obj">object</span><h3>User &amp; UserGroup</h3><p>Notification recipients, each with <code>states</code> and <code>types</code> filters: only tell me about these states and these event kinds.</p></div>
+      <div class="card"><span class="tag t-obj">command</span><h3>NotificationCommand</h3><p>What to run to notify (email, chat, a script). Its <code>$macros$</code> resolve host/service/notification context.</p></div>
+      <div class="card"><span class="tag t-obj">rule</span><h3>Notification</h3><p>Binds a command + users + period + filters to a checkable, usually via <code>apply ... to Service</code> with <code>assign where</code>.</p></div>
+      <div class="card"><span class="tag t-obj">grouping</span><h3>HostGroup / ServiceGroup</h3><p>Membership sets used for filtering, dashboards, and as targets for <code>apply</code> rules.</p></div>
+      <div class="card"><span class="tag t-obj">meta</span><h3>apply rule</h3><p><code>apply Service "disk" to Host { assign where ... }</code> generates objects across everything matching an expression. Config that scales.</p></div>
+    </div>
+  </section>
+
+  <!-- CHECK PIPELINE -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">The check pipeline</p>
+      <h2>Exit code to state, soft to hard</h2>
+      <p>The plugin's exit code is the state. A failing check is SOFT at first and only becomes HARD after <code>max_check_attempts</code> retries - which is what stops a single blip from paging anyone. Notifications fire on the HARD transition.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Exit</th><th>State</th><th>Meaning</th><th>Output convention</th></tr></thead>
+        <tbody>
+          <tr><td class="exit" style="color:var(--ok)">0</td><td>OK</td><td>Everything nominal</td><td rowspan="4" style="vertical-align:top"><span class="mono">text | label=value;warn;crit;min;max</span><br><span style="color:var(--ink-soft);font-size:13px">stdout is the message; the part after <code>|</code> is performance data for graphing.</span></td></tr>
+          <tr><td class="exit" style="color:var(--warn)">1</td><td>WARNING</td><td>Degraded, not down</td></tr>
+          <tr><td class="exit" style="color:var(--crit)">2</td><td>CRITICAL</td><td>Failed / breached</td></tr>
+          <tr><td class="exit" style="color:var(--unknown)">3</td><td>UNKNOWN</td><td>Check itself could not run</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="states">
+      <div class="state-box sb-ok"><b style="color:var(--ok)">HARD OK</b>service healthy</div>
+      <div class="arrow">&#8594;<small>1st bad check</small></div>
+      <div class="state-box sb-soft"><b style="color:var(--warn)">SOFT CRITICAL</b>attempt 1 of N</div>
+      <div class="arrow">&#8594;<small>retry_interval</small></div>
+      <div class="state-box sb-hard"><b style="color:var(--crit)">HARD CRITICAL</b>max_check_attempts reached &rarr; notify</div>
+      <div class="arrow">&#8594;<small>recovers</small></div>
+      <div class="state-box sb-ok"><b style="color:var(--ok)">HARD OK</b>recovery notify</div>
+    </div>
+    <div class="grid cols-3" style="margin-top:14px;">
+      <div class="card"><h3 class="mono">check_interval</h3><p>How often a stable check runs (15s in this chamber).</p></div>
+      <div class="card"><h3 class="mono">retry_interval</h3><p>Faster recheck cadence while in a SOFT state (5s here).</p></div>
+      <div class="card"><h3 class="mono">max_check_attempts</h3><p>SOFT failures needed before HARD (2 here). The anti-noise dial.</p></div>
+    </div>
+  </section>
+
+  <!-- CONFIG DELIVERY -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Config as code</p>
+      <h2>Three ways to deliver config</h2>
+      <p>The chart mounts Icinga 2's <code>/etc/icinga2</code> from a ConfigMap and disables <code>conf.d</code>, so this chamber uses the middle lane: the REST API config-package endpoint.</p>
+    </div>
+    <div class="grid cols-3">
+      <div class="card"><span class="tag t-obj">lane 1</span><h3>conf.d files</h3><p>Plain <code>.conf</code> files on disk. Fine for one static node, awkward in a container. Disabled by the chart.</p></div>
+      <div class="card" style="border-color:var(--accent)"><span class="tag t-engine">lane 2 &middot; used here</span><h3>REST API config package</h3><p><code>POST /v1/config/packages/&lt;pkg&gt;</code> then <code>POST /v1/config/stages/&lt;pkg&gt;</code> with a files map. Icinga validates and reloads. Version-controllable and scriptable.</p></div>
+      <div class="card"><span class="tag t-ui">lane 3</span><h3>Icinga Director</h3><p>A web module + DB that manages config with import/sync and deploys to Icinga 2 over the API. The fleet-scale option.</p></div>
+    </div>
+    <div class="callout" style="margin-top:16px;">
+      <strong>Gotcha.</strong> In config strings <code>$</code> delimits a macro, so a shell <code>$(date)</code> inside a command throws a macro error. Use Icinga's own macros (<code>$icinga.long_date_time$</code>, <code>$service.output$</code>) or escape a literal <code>$</code> as <code>$$</code>.
+    </div>
+  </section>
+
+  <!-- NOTIFICATIONS -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Notifications</p>
+      <h2>The filter chain</h2>
+      <p>A notification only sends when every gate passes - which is exactly the anti-noise design. Miss one and nothing sends, which is the usual reason a "broken" notification is actually a filter.</p>
+    </div>
+    <div class="gates">
+      <span class="gate">HARD state change</span>
+      <span class="gate">type in filter<br><span style="color:var(--ink-soft)">Problem / Recovery / ...</span></span>
+      <span class="gate">state in filter<br><span style="color:var(--ink-soft)">Critical / Warning / OK</span></span>
+      <span class="gate">inside TimePeriod</span>
+      <span class="gate">enabled on host, service, user &amp; globally</span>
+      <span class="gate" style="border-color:var(--accent);color:var(--accent)">send</span>
+    </div>
+  </section>
+
+  <!-- ICINGA VS PROM -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Paradigm</p>
+      <h2>Icinga vs Prometheus</h2>
+      <p>Two honest ways to know if something is broken. They are complementary, not rivals - this chamber is the check-and-notify counterpart to the pull-model SLO chamber next door.</p>
+    </div>
+    <div class="compare">
+      <div class="lane icinga">
+        <h3>Icinga (this chamber)</h3>
+        <ul>
+          <li><b>Push model:</b> an active scheduler runs checks.</li>
+          <li><b>Discrete states:</b> OK / WARNING / CRITICAL / UNKNOWN per host and service.</li>
+          <li><b>Soft vs hard</b> states suppress flapping before notifying.</li>
+          <li><b>Notifications</b> on state change, with users, periods, and filters.</li>
+          <li><b>Plugin-based:</b> any exit-code program is a check.</li>
+          <li>Best for reachability, host/service up-down, black-box checks.</li>
+        </ul>
+      </div>
+      <div class="lane prom">
+        <h3>Prometheus</h3>
+        <ul>
+          <li><b>Pull model:</b> scrapes numeric metrics on an interval.</li>
+          <li><b>Time series:</b> labelled samples over time, queried with PromQL.</li>
+          <li><b>Alerting rules</b> evaluate expressions; Alertmanager routes.</li>
+          <li><b>SLOs / burn rate</b> fall out of the math naturally.</li>
+          <li><b>Instrumentation-based:</b> apps expose <code>/metrics</code>.</li>
+          <li>Best for rates, latencies, saturation, trend and capacity.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Grounded in the <code>kind-icinga</code> chamber: <code>task up</code> installs this stack on kind, <code>task apply</code> pushes the monitoring config through the REST API, and <code>task check-demo</code> drives a service OK &rarr; HARD CRITICAL &rarr; recovery with real notifications. Web UI at <code>http://localhost:18082</code> (icingaadmin / icinga). See <code>icinga.md</code> for the prose deep-dive.
+  </footer>
+</div>
+</body>
+</html>

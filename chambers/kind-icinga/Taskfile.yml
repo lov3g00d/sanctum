@@ -1,0 +1,81 @@
+version: '3'
+
+vars:
+  KIND_CLUSTER: icinga
+  NS: icinga
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: kind + Icinga stack + the sample app, then push the monitoring config
+    cmds:
+      - task: kind-up
+      - task: image
+      - task: install
+      - task: deploy
+      - task: apply
+      - 'echo "up. icinga web = http://localhost:18082  (icingaadmin/icinga)"'
+
+  kind-up:
+    desc: Create the kind cluster (skips if it exists)
+    status:
+      - kind get clusters | grep -qx {{.KIND_CLUSTER}}
+    cmds:
+      - kind create cluster --config kind/cluster.yaml
+
+  image:
+    desc: Build the sample app image and load it into kind
+    cmds:
+      - docker build -t webapp:dev app/
+      - kind load docker-image webapp:dev --name {{.KIND_CLUSTER}}
+
+  install:
+    desc: Install the Icinga stack (Icinga 2 + Icinga DB + Icinga Web 2)
+    cmds:
+      - helm repo add icinga https://icinga.github.io/helm-charts 2>/dev/null || true
+      - helm repo update icinga
+      - >-
+        helm upgrade --install icinga icinga/icinga-stack
+        --namespace {{.NS}} --create-namespace --version 0.7.0
+        -f values.yaml --wait --timeout 10m
+
+  deploy:
+    desc: Deploy the sample app and the Icinga Web NodePort
+    cmds:
+      - kubectl apply -f k8s/app.yaml
+      - kubectl apply -f k8s/icingaweb-nodeport.yaml
+      - kubectl -n web rollout status deploy/webapp --timeout=120s
+
+  apply:
+    desc: Push the monitoring config (Host, Service, Notification) via the Icinga 2 API
+    cmds:
+      - bash scripts/apply-config.sh
+
+  status:
+    desc: Current state of the monitored service, read from the Icinga 2 API
+    silent: true
+    cmds:
+      - bash scripts/status.sh
+
+  break:
+    desc: Make the sample app return HTTP 500 on /healthz
+    cmds:
+      - kubectl -n web exec deploy/webapp -- python -c "import urllib.request,json; urllib.request.urlopen(urllib.request.Request('http://localhost:8080/config',data=json.dumps({'healthy':False}).encode(),headers={'Content-Type':'application/json'},method='POST'))"
+
+  heal:
+    desc: Make the sample app healthy again
+    cmds:
+      - kubectl -n web exec deploy/webapp -- python -c "import urllib.request,json; urllib.request.urlopen(urllib.request.Request('http://localhost:8080/config',data=json.dumps({'healthy':True}).encode(),headers={'Content-Type':'application/json'},method='POST'))"
+
+  check-demo:
+    desc: OK, break to HARD CRITICAL + notification, heal to recovery, via the API
+    cmds:
+      - bash scripts/check-demo.sh
+
+  down:
+    desc: Delete the kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}}

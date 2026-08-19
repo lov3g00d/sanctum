@@ -1,0 +1,49 @@
+icinga2:
+  config:
+    ticket_salt:
+      value: "lab-ticket-salt-change-me-0123456789abcdef"
+
+icingaweb2:
+  service:
+    type: ClusterIP
+  modules:
+    director:
+      enabled: true
+      kickstart: true
+    kubernetes:
+      enabled: true
+  auth:
+    admin_password:
+      value: "icinga"
+
+icinga-kubernetes:
+  enabled: true
+  image:
+    tag: "0.3.0"
+
+global:
+  api:
+    users:
+      director:
+        password:
+          value: "director-api"
+        permissions: ["*"]
+      icingaweb:
+        password:
+          value: "icingaweb-api"
+        permissions: ["*"]
+  databases:
+    director:
+      enabled: true
+      username: { value: director }
+      password: { value: lab-director-db }
+    icingadb:
+      username: { value: icingadb }
+      password: { value: lab-icingadb-db }
+    icingaweb2:
+      username: { value: icingaweb2 }
+      password: { value: lab-icingaweb2-db }
+    kubernetes:
+      enabled: true
+      username: { value: kubernetes }
+      password: { value: lab-kubernetes-db }

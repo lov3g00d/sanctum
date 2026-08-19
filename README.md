@@ -17,6 +17,7 @@ pieces they draw on. It is built for practice and prototyping, not as a product.
 | [`kind-kafka`](chambers/kind-kafka/) | Local Kafka on kind + Strimzi (operator via its community Helm chart) |
 | [`kind-slo-error-budget`](chambers/kind-slo-error-budget/) | SLO practice on kind: an app with tunable failure, HA Prometheus (kube-prometheus-stack), SLIs, error budgets, and multi-window burn-rate alerts |
 | [`kind-istio-mesh`](chambers/kind-istio-mesh/) | Istio service mesh on kind: a v1/v2 app with weighted routing for canary and blue-green releases, and STRICT mutual TLS |
+| [`kind-icinga`](chambers/kind-icinga/) | Icinga on kind: the check-and-notify stack (Icinga 2 + Icinga DB + Icinga Web 2) monitoring an app, with a check driven to CRITICAL and a notification, config pushed via the REST API |
 
 Each chamber is self-contained, with its own README covering prerequisites, stand-up,
 tear-down, and what it demonstrates. Adding one is additive: a new environment is a new
