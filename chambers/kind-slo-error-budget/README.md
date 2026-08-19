@@ -1,4 +1,4 @@
-# Chamber: slo-error-budget
+# Chamber: kind-slo-error-budget
 
 An SLO practice lab on **kind + the Prometheus Operator**: a sample HTTP service
 with tunable errors and latency, a load generator, and a prod-shaped Prometheus.
@@ -32,7 +32,7 @@ replica) for a consistent view. This chamber leaves that as the next rung.
 ## Use
 
 ```sh
-cd chambers/slo-error-budget
+cd chambers/kind-slo-error-budget
 task up          # kind + kube-prometheus-stack + app + loadgen + rules
 task status      # current availability SLI and burn rate
 task break       # inject 50% errors
