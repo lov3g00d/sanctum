@@ -28,6 +28,10 @@ task status      # current traffic split and sidecar count
 task canary      # shift v1 -> v2 gradually (90/10, 50/50, 0/100)
 task bluegreen   # flip v1 -> v2 in one step, then roll back
 task mtls-demo   # STRICT mTLS accepts a meshed client, rejects a plaintext one
+task fault       # inject faults (Istio returns errors without calling the app)
+task resilience  # route timeouts and retries masking transient failures
+task circuit     # circuit breaking: a tight connection pool sheds load with 503
+task mirror      # mirror live traffic to v2 while users still get v1
 task reset       # route 100% back to v1
 task down        # delete the kind cluster
 ```
@@ -45,3 +49,12 @@ answers as you change the weights).
   exposed through a `Gateway`, all as data-plane config the app never sees.
 - **Zero-trust mTLS**: STRICT `PeerAuthentication` means workloads only accept
   mutual-TLS from other sidecars; a plaintext client is rejected by the mesh.
+- **Resilience and testing in the mesh**: fault injection, route timeouts and
+  retries, circuit breaking (connection-pool shedding), and traffic mirroring,
+  all as `VirtualService`/`DestinationRule` config the app never sees.
+
+## Reference
+
+[`istio.md`](istio.md) is a deep-dive on how Istio works end to end (data plane
+vs control plane, sidecar injection, the request path, the config CRDs, mTLS,
+xDS), grounded in this chamber.

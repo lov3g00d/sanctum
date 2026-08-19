@@ -78,6 +78,26 @@ tasks:
     cmds:
       - bash scripts/mtls-demo.sh
 
+  fault:
+    desc: Inject faults (Istio returns errors without calling the app)
+    cmds:
+      - bash scripts/fault-demo.sh
+
+  resilience:
+    desc: Route timeouts and retries masking transient failures
+    cmds:
+      - bash scripts/resilience-demo.sh
+
+  circuit:
+    desc: Circuit breaking - a tight connection pool sheds load with 503
+    cmds:
+      - bash scripts/circuit-demo.sh
+
+  mirror:
+    desc: Mirror live traffic to v2 while users still get v1
+    cmds:
+      - bash scripts/mirror-demo.sh
+
   reset:
     desc: Route 100% back to v1
     cmds:
