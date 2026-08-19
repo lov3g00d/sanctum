@@ -1,0 +1,431 @@
+<title>Istio CRDs - the mesh configuration surface</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f6f8fc; --surface: #ffffff; --surface-2: #eef2f8;
+    --ink: #101722; --muted: #5b6779; --faint: #8c98a8;
+    --line: #dde3ec; --line-2: #cbd4e0;
+    --accent: #4f5bd5;              /* structural / control plane */
+    --traffic: #0f9aa3;            /* traffic management */
+    --security: #b9761b;           /* security */
+    --telemetry: #7c4dd6;          /* telemetry + extensibility */
+    --code-bg: #0e1420; --code-ink: #d7e0ee; --code-dim: #7f8ea6;
+    --shadow: 0 1px 2px rgba(16,23,34,.06), 0 8px 24px rgba(16,23,34,.05);
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a0e16; --surface: #111826; --surface-2: #0e1420;
+      --ink: #e7edf6; --muted: #9aa7ba; --faint: #6b7688;
+      --line: #1e2836; --line-2: #2a3547;
+      --accent: #7b86ff; --traffic: #35c9cf; --security: #e6a94b; --telemetry: #b18cf5;
+      --code-bg: #060a12; --code-ink: #d7e0ee; --code-dim: #6d7c93;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8fc; --surface: #ffffff; --surface-2: #eef2f8;
+    --ink: #101722; --muted: #5b6779; --faint: #8c98a8; --line: #dde3ec; --line-2: #cbd4e0;
+    --accent: #4f5bd5; --traffic: #0f9aa3; --security: #b9761b; --telemetry: #7c4dd6;
+    --code-bg: #0e1420; --code-ink: #d7e0ee; --code-dim: #7f8ea6;
+    --shadow: 0 1px 2px rgba(16,23,34,.06), 0 8px 24px rgba(16,23,34,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0e16; --surface: #111826; --surface-2: #0e1420;
+    --ink: #e7edf6; --muted: #9aa7ba; --faint: #6b7688; --line: #1e2836; --line-2: #2a3547;
+    --accent: #7b86ff; --traffic: #35c9cf; --security: #e6a94b; --telemetry: #b18cf5;
+    --code-bg: #060a12; --code-ink: #d7e0ee; --code-dim: #6d7c93;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent); }
+
+  /* ---------- hero ---------- */
+  header.hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--faint); margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--mono); font-weight: 700; letter-spacing: -.01em;
+    font-size: clamp(34px, 6vw, 58px); line-height: 1.02; margin: 0;
+    text-wrap: balance;
+  }
+  h1 .k { color: var(--accent); }
+  .lede {
+    max-width: 62ch; margin: 22px 0 0; font-size: 18px; color: var(--muted);
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 28px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .dot.t { background: var(--traffic); } .dot.s { background: var(--security); } .dot.o { background: var(--telemetry); }
+
+  section { padding: 52px 0; border-bottom: 1px solid var(--line); }
+  .kicker {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--faint); margin: 0 0 8px;
+  }
+  h2 { font-family: var(--mono); font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 26px; max-width: 66ch; }
+
+  /* ---------- architecture diagram ---------- */
+  .arch { display: grid; gap: 18px; }
+  .plane {
+    border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+    padding: 18px 18px 20px; box-shadow: var(--shadow);
+  }
+  .plane .tag {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--faint); margin-bottom: 14px; display: flex; justify-content: space-between; gap: 10px;
+  }
+  .control .tag { color: var(--accent); }
+  .istiod-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .box {
+    border: 1px solid var(--line-2); border-radius: 10px; padding: 12px 14px; background: var(--surface-2);
+  }
+  .box b { font-family: var(--mono); font-size: 13.5px; }
+  .box small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .xds { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: .04em; }
+  .xds::before, .xds::after { content: "↓ "; }
+
+  .datapath { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: 12px; }
+  .pod { border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; background: var(--surface-2); }
+  .pod .plabel { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); padding: 9px 12px 0; }
+  .pod .cells { display: flex; gap: 8px; padding: 10px 12px 12px; }
+  .cell { flex: 1; border-radius: 8px; padding: 9px 10px; font-family: var(--mono); font-size: 12.5px; text-align: center; }
+  .cell.app { background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+  .cell.proxy { background: color-mix(in srgb, var(--traffic) 15%, transparent); border: 1px solid color-mix(in srgb, var(--traffic) 42%, transparent); color: var(--ink); }
+  .link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 92px; }
+  .link .lock { font-size: 20px; }
+  .link .mtls { font-family: var(--mono); font-size: 11px; color: var(--security); letter-spacing: .08em; }
+  .link .arrow { color: var(--traffic); font-size: 18px; }
+
+  /* ---------- lifecycle strip ---------- */
+  .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .step { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px; box-shadow: var(--shadow); }
+  .step .n { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .step h4 { margin: 6px 0 8px; font-size: 15px; font-family: var(--mono); }
+  .step p { margin: 0; font-size: 13px; color: var(--muted); }
+  .step .crds { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+
+  /* ---------- crd cards ---------- */
+  .cat-head { display: flex; align-items: baseline; gap: 14px; margin: 0 0 4px; }
+  .cat-head .bar { width: 34px; height: 6px; border-radius: 4px; flex: none; align-self: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .card {
+    border: 1px solid var(--line); border-top: 3px solid var(--cat); border-radius: 13px;
+    background: var(--surface); padding: 18px 18px 16px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 11px;
+  }
+  .card .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .card .name { font-family: var(--mono); font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+  .card .api { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .card .purpose { font-size: 14.5px; color: var(--ink); }
+  .card .idea { font-size: 13.5px; color: var(--muted); border-left: 2px solid var(--cat); padding-left: 11px; }
+  .field-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-family: var(--mono); font-size: 11.5px; padding: 3px 9px; border-radius: 20px;
+    background: color-mix(in srgb, var(--cat) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cat) 30%, transparent); color: var(--ink);
+  }
+  .acts { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .acts b { font-family: var(--mono); font-weight: 600; color: color-mix(in srgb, var(--cat) 70%, var(--ink)); }
+  pre {
+    margin: 2px 0 0; background: var(--code-bg); color: var(--code-ink);
+    border-radius: 9px; padding: 12px 13px; overflow-x: auto;
+    font-family: var(--mono); font-size: 12px; line-height: 1.5;
+  }
+  pre .c { color: var(--code-dim); }
+  pre .key { color: #7bd0ff; }
+
+  /* ---------- mental model ---------- */
+  .model { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  .mcard { border: 1px solid var(--line); border-radius: 12px; padding: 16px 16px; background: var(--surface); box-shadow: var(--shadow); }
+  .mcard .h { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+  .mcard p { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+
+  footer { padding: 40px 0 64px; color: var(--muted); font-size: 13.5px; }
+  footer .note { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--surface); box-shadow: var(--shadow); }
+  footer b { color: var(--ink); font-family: var(--mono); }
+
+  @media (max-width: 760px) {
+    .istiod-row { grid-template-columns: 1fr; }
+    .datapath { grid-template-columns: 1fr; }
+    .link { flex-direction: row; min-width: 0; padding: 4px 0; }
+    .flow { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .card { transition: transform .15s ease, box-shadow .15s ease; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,.08), 0 16px 40px rgba(0,0,0,.12); }
+  }
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Service mesh reference</p>
+    <h1>Istio <span class="k">CRDs</span><br>the mesh configuration surface</h1>
+    <p class="lede">Every Istio behavior is a custom resource that <b>istiod compiles into Envoy config</b> and pushes to the proxies over xDS. Your app makes plain calls; these objects decide how traffic is routed, secured, and observed. Grouped by concern, with purpose, the core idea, what it can do, and where in the request it acts.</p>
+    <div class="legend">
+      <span><i class="dot t"></i> Traffic management &middot; <code>networking.istio.io</code></span>
+      <span><i class="dot s"></i> Security &middot; <code>security.istio.io</code></span>
+      <span><i class="dot o"></i> Telemetry &amp; extensibility</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <p class="kicker">The machine</p>
+    <h2>Two planes, one control loop</h2>
+    <p class="sub">The <b>data plane</b> is an Envoy proxy beside every workload; the <b>control plane</b> (istiod) watches Kubernetes and these CRDs, mints workload certificates, and streams config to the proxies. Nothing here touches application code.</p>
+    <div class="arch">
+      <div class="plane control">
+        <div class="tag"><span>Control plane &middot; istiod</span><span>computes config + identity</span></div>
+        <div class="istiod-row">
+          <div class="box"><b>Pilot</b><small>watches Services + CRDs, renders Envoy config, pushes over xDS</small></div>
+          <div class="box"><b>CA</b><small>issues + rotates each workload's mTLS certificate (~24h)</small></div>
+          <div class="box"><b>Injection webhook</b><small>adds the sidecar to pods at admission</small></div>
+        </div>
+      </div>
+      <div class="xds">xDS push (LDS · RDS · CDS · EDS) to every proxy</div>
+      <div class="plane">
+        <div class="tag"><span>Data plane &middot; Envoy</span><span>enforces routing, mTLS, telemetry</span></div>
+        <div class="datapath">
+          <div class="pod">
+            <div class="plabel">Client pod</div>
+            <div class="cells"><div class="cell app">app</div><div class="cell proxy">istio-proxy</div></div>
+          </div>
+          <div class="link">
+            <span class="lock">🔒</span>
+            <span class="mtls">mTLS</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="pod">
+            <div class="plabel">Server pod</div>
+            <div class="cells"><div class="cell proxy">istio-proxy</div><div class="cell app">app</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="kicker">Where each CRD acts</p>
+    <h2>One request, five decision points</h2>
+    <p class="sub">A request enters at the edge, gets routed, lands on a chosen pool, is authenticated and authorized, and is measured. Different resources own different steps.</p>
+    <div class="flow">
+      <div class="step"><div class="n">01 · edge</div><h4>Admit</h4><p>Open the port and host at the ingress gateway.</p><div class="chips crds"><span class="chip" style="--cat:var(--traffic)">Gateway</span></div></div>
+      <div class="step"><div class="n">02 · L7</div><h4>Route</h4><p>Match, split by weight, retry, timeout, mirror, inject faults.</p><div class="chips crds"><span class="chip" style="--cat:var(--traffic)">VirtualService</span></div></div>
+      <div class="step"><div class="n">03 · upstream</div><h4>Balance</h4><p>Pick a subset, load-balance, pool limits, eject bad hosts.</p><div class="chips crds"><span class="chip" style="--cat:var(--traffic)">DestinationRule</span></div></div>
+      <div class="step"><div class="n">04 · zero-trust</div><h4>Secure</h4><p>Require mTLS, verify the JWT, allow or deny the caller.</p><div class="chips crds"><span class="chip" style="--cat:var(--security)">Peer / Request / AuthorizationPolicy</span></div></div>
+      <div class="step"><div class="n">05 · signals</div><h4>Observe</h4><p>Emit metrics, traces, and access logs for the hop.</p><div class="chips crds"><span class="chip" style="--cat:var(--telemetry)">Telemetry</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cat-head"><span class="bar" style="background:var(--traffic)"></span><h2 style="color:var(--traffic)">Traffic management</h2></div>
+    <p class="sub"><code>networking.istio.io</code> - routing, resilience, and the mesh's service registry. This is where canary, blue-green, retries, and circuit breaking live.</p>
+    <div class="grid">
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">Gateway</span><span class="api">networking/v1</span></div>
+        <p class="purpose">Opens ports and hosts on a standalone edge Envoy (ingress or egress).</p>
+        <p class="idea">The door, not the router. It says "accept HTTP on :80 for these hosts"; a VirtualService bound to it decides where that traffic goes.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">ports + protocols</span><span class="chip">TLS termination</span><span class="chip">host / SNI match</span></div></div>
+        <div class="acts">Acts at &middot; <b>edge gateway proxy</b></div>
+        <pre><span class="c"># :80 HTTP, any host</span>
+<span class="key">servers:</span> [{ port: {number: 80, protocol: HTTP}, hosts: ["*"] }]</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">VirtualService</span><span class="api">networking/v1</span></div>
+        <p class="purpose">The L7 routing rulebook: match requests, then decide what happens to them.</p>
+        <p class="idea">Everything about a request's path in one place. Split by weight for canary, flip for blue-green, and add resilience and testing behaviors.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">weighted split</span><span class="chip">retries</span><span class="chip">timeouts</span><span class="chip">fault inject</span><span class="chip">mirror</span><span class="chip">header / URI rewrite</span></div></div>
+        <div class="acts">Acts at &middot; <b>client-side proxy + gateway</b></div>
+        <pre><span class="key">route:</span>
+  - { destination: {host: web, subset: v1}, <span class="key">weight:</span> 90 }
+  - { destination: {host: web, subset: v2}, <span class="key">weight:</span> 10 }</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">DestinationRule</span><span class="api">networking/v1</span></div>
+        <p class="purpose">Policy for a destination after routing has chosen it: subsets, LB, pooling, health.</p>
+        <p class="idea">Defines the named <code>subsets</code> (v1/v2 by label) that VirtualService routes to, plus how to talk to them.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">subsets</span><span class="chip">load-balancer</span><span class="chip">connection pool</span><span class="chip">outlier detection</span><span class="chip">upstream TLS</span></div></div>
+        <div class="acts">Acts at &middot; <b>client-side proxy</b></div>
+        <pre><span class="key">subsets:</span>
+  - { name: v1, labels: {version: v1} }
+  - { name: v2, labels: {version: v2} }</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">ServiceEntry</span><span class="api">networking/v1</span></div>
+        <p class="purpose">Adds an external or non-mesh service into the mesh's internal registry.</p>
+        <p class="idea">Teach the mesh about a database, a SaaS API, or a legacy host so sidecars can route to, secure, and observe calls that leave the cluster.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">register external hosts</span><span class="chip">egress control</span><span class="chip">apply VS/DR to externals</span></div></div>
+        <div class="acts">Acts at &middot; <b>mesh registry</b></div>
+        <pre><span class="key">hosts:</span> [api.stripe.com]
+<span class="key">location:</span> MESH_EXTERNAL
+<span class="key">resolution:</span> DNS</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">Sidecar</span><span class="api">networking/v1</span></div>
+        <p class="purpose">Scopes which services a proxy is configured for, and its egress rules.</p>
+        <p class="idea">By default every Envoy gets config for every service in the mesh. On a large mesh that is huge. Sidecar trims each proxy to what its workload actually calls.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">limit config scope</span><span class="chip">egress hosts</span><span class="chip">cut proxy memory</span></div></div>
+        <div class="acts">Acts at &middot; <b>per namespace / workload</b></div>
+        <pre><span class="key">egress:</span>
+  - hosts: ["./*", "istio-system/*"]</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">WorkloadEntry</span><span class="api">networking/v1</span></div>
+        <p class="purpose">Registers a non-Kubernetes workload (a VM, bare metal) as a mesh endpoint.</p>
+        <p class="idea">Give a VM a mesh identity and IP so a Service can select it and it gets mTLS + policy like any pod. Mesh beyond Kubernetes.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">VM as endpoint</span><span class="chip">identity for non-pods</span></div></div>
+        <div class="acts">Acts at &middot; <b>mesh registry</b></div>
+        <pre><span class="key">address:</span> 10.0.0.5
+<span class="key">serviceAccount:</span> vm-web
+<span class="key">labels:</span> {app: web}</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">WorkloadGroup</span><span class="api">networking/v1</span></div>
+        <p class="purpose">A template that auto-generates WorkloadEntries as VMs come and go.</p>
+        <p class="idea">The Deployment-equivalent for VMs: one group definition, and the mesh registers/deregisters instances with health checks automatically.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">VM autoregistration</span><span class="chip">health probes</span></div></div>
+        <div class="acts">Acts at &middot; <b>mesh registry</b></div>
+        <pre><span class="key">template:</span> { serviceAccount: vm-web, labels: {app: web} }
+<span class="key">probe:</span> { httpGet: {path: /healthz, port: 8080} }</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">EnvoyFilter</span><span class="api">networking/v1a3</span></div>
+        <p class="purpose">The escape hatch: patch the generated Envoy config directly.</p>
+        <p class="idea">When no first-class CRD exposes an Envoy feature, EnvoyFilter injects/patches raw listener, route, or filter config. Powerful, version-fragile, last resort.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">raw Envoy patches</span><span class="chip">custom filters</span><span class="chip">advanced tuning</span></div></div>
+        <div class="acts">Acts at &middot; <b>any proxy (by selector)</b></div>
+        <pre><span class="c"># surgical, tied to Envoy's schema</span>
+<span class="key">configPatches:</span> [{ applyTo: HTTP_FILTER, patch: {...} }]</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--traffic)">
+        <div class="top"><span class="name">ProxyConfig</span><span class="api">networking/v1b1</span></div>
+        <p class="purpose">Sets proxy-level runtime options for a scope of workloads.</p>
+        <p class="idea">Tune the sidecar itself (concurrency, env, image) per namespace or selector without editing every pod.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">worker concurrency</span><span class="chip">proxy image</span><span class="chip">env overrides</span></div></div>
+        <div class="acts">Acts at &middot; <b>proxy runtime</b></div>
+        <pre><span class="key">concurrency:</span> 2
+<span class="key">environmentVariables:</span> { ... }</pre>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cat-head"><span class="bar" style="background:var(--security)"></span><h2 style="color:var(--security)">Security</h2></div>
+    <p class="sub"><code>security.istio.io</code> - zero-trust in three layers: is the transport encrypted (Peer), is the end-user who they claim (Request), and is this caller allowed (Authorization).</p>
+    <div class="grid">
+
+      <article class="card" style="--cat:var(--security)">
+        <div class="top"><span class="name">PeerAuthentication</span><span class="api">security/v1</span></div>
+        <p class="purpose">Sets the mutual-TLS mode for workload-to-workload traffic.</p>
+        <p class="idea">"Is it really the calling service, over an encrypted channel." STRICT accepts only mTLS; PERMISSIVE accepts both so you can migrate a live system with no downtime, then flip.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">STRICT</span><span class="chip">PERMISSIVE</span><span class="chip">DISABLE</span><span class="chip">per-port mode</span></div></div>
+        <div class="acts">Acts at &middot; <b>server-side proxy</b></div>
+        <pre><span class="key">mtls:</span> { mode: STRICT }</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--security)">
+        <div class="top"><span class="name">RequestAuthentication</span><span class="api">security/v1</span></div>
+        <p class="purpose">Validates end-user credentials (JWTs) on incoming requests.</p>
+        <p class="idea">Origin auth, separate from workload mTLS. It verifies a token's issuer + signature (JWKS) and exposes its claims for AuthorizationPolicy to act on. It rejects bad tokens but does not require one on its own.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">JWT verify</span><span class="chip">JWKS / issuer</span><span class="chip">claims → policy</span></div></div>
+        <div class="acts">Acts at &middot; <b>server-side proxy (L7)</b></div>
+        <pre><span class="key">jwtRules:</span>
+  - { issuer: "https://accounts.example.com", jwksUri: ... }</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--security)">
+        <div class="top"><span class="name">AuthorizationPolicy</span><span class="api">security/v1</span></div>
+        <p class="purpose">Allow / deny rules on who may call what, at L7.</p>
+        <p class="idea">The "can they" layer on top of "are they." Match on source identity (SPIFFE), namespace, method, path, or JWT claims; default-deny once any ALLOW policy exists on a workload.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">ALLOW / DENY</span><span class="chip">by identity + claim</span><span class="chip">method + path</span><span class="chip">CUSTOM (ext authz)</span></div></div>
+        <div class="acts">Acts at &middot; <b>server-side proxy</b></div>
+        <pre><span class="key">action:</span> ALLOW
+<span class="key">rules:</span> [{ from: [{source: {principals: ["*/ns/web/*"]}}] }]</pre>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cat-head"><span class="bar" style="background:var(--telemetry)"></span><h2 style="color:var(--telemetry)">Telemetry &amp; extensibility</h2></div>
+    <p class="sub"><code>telemetry.istio.io</code> &amp; <code>extensions.istio.io</code> - shape the signals the mesh emits, and extend the proxy itself.</p>
+    <div class="grid">
+
+      <article class="card" style="--cat:var(--telemetry)">
+        <div class="top"><span class="name">Telemetry</span><span class="api">telemetry/v1</span></div>
+        <p class="purpose">Configures metrics, traces, and access logs the proxies produce.</p>
+        <p class="idea">Every hop already emits signals; this tunes them: pick providers, set trace sampling, add or drop metric dimensions, toggle access logs, scoped mesh-wide or per workload.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">trace sampling</span><span class="chip">metric overrides</span><span class="chip">access logs</span><span class="chip">provider select</span></div></div>
+        <div class="acts">Acts at &middot; <b>any proxy (by selector)</b></div>
+        <pre><span class="key">tracing:</span> [{ randomSamplingPercentage: 10 }]
+<span class="key">accessLogging:</span> [{ providers: [{name: otel}] }]</pre>
+      </article>
+
+      <article class="card" style="--cat:var(--telemetry)">
+        <div class="top"><span class="name">WasmPlugin</span><span class="api">extensions/v1a1</span></div>
+        <p class="purpose">Loads a WebAssembly module into the proxies as a custom filter.</p>
+        <p class="idea">Extend the data plane in any Wasm-target language (custom auth, header logic, redaction) without rebuilding Envoy or writing an EnvoyFilter.</p>
+        <div><div class="field-label">Can do</div><div class="chips"><span class="chip">custom L7 logic</span><span class="chip">OCI-pulled modules</span><span class="chip">phase ordering</span></div></div>
+        <div class="acts">Acts at &middot; <b>any proxy (by selector)</b></div>
+        <pre><span class="key">url:</span> oci://ghcr.io/org/my-filter:1.0
+<span class="key">phase:</span> AUTHN</pre>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="kicker">The mental model</p>
+    <h2>Four sentences that untangle it</h2>
+    <p class="sub">The names overlap in the docs; these hold the shape.</p>
+    <div class="model">
+      <div class="mcard"><div class="h" style="color:var(--traffic)">VirtualService = routing</div><p>What happens to a request: match, split, retry, timeout, mirror.</p></div>
+      <div class="mcard"><div class="h" style="color:var(--traffic)">DestinationRule = the pool</div><p>Policy for what you routed to: subsets, load balancing, circuit breaking.</p></div>
+      <div class="mcard"><div class="h" style="color:var(--traffic)">Gateway = the edge</div><p>Opens the port/host. Routing still comes from a VirtualService.</p></div>
+      <div class="mcard"><div class="h" style="color:var(--security)">Peer / Authz = security</div><p>Peer proves it is really them (mTLS); Authorization decides if they may.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="note">
+      <b>Two things to know beyond the list.</b><br>
+      The <b>Kubernetes Gateway API</b> (<code>gateway.networking.k8s.io</code>: <code>Gateway</code>, <code>HTTPRoute</code>) is the vendor-neutral standard Istio also implements, and the direction for new setups; classic <code>Gateway</code> + <code>VirtualService</code> stays feature-rich. In <b>ambient mode</b> there are no sidecars: a per-node <code>ztunnel</code> does L4 + mTLS, and L7 features run in a <code>waypoint</code> proxy provisioned through the Gateway API. Same control plane, same security and routing intent, a lighter data plane.
+    </div>
+  </div>
+</footer>

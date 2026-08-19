@@ -57,4 +57,6 @@ answers as you change the weights).
 
 [`istio.md`](istio.md) is a deep-dive on how Istio works end to end (data plane
 vs control plane, sidecar injection, the request path, the config CRDs, mTLS,
-xDS), grounded in this chamber.
+xDS), grounded in this chamber, with Mermaid diagrams and a full CRD catalog.
+[`istio-crds.html`](istio-crds.html) is a self-contained visual reference to
+every custom resource (open it in a browser).

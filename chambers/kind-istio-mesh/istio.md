@@ -5,6 +5,9 @@ crossing two sidecars with mutual TLS. Grounded in the `web` v1/v2 app, the
 weighted `VirtualService`, the STRICT `PeerAuthentication`, and the ingress
 gateway defined under `k8s/`.
 
+For a visual version of the CRD catalog, open [`istio-crds.html`](istio-crds.html)
+in a browser (a self-contained, offline reference to every custom resource).
+
 ## The one idea
 
 A service mesh moves networking concerns (routing, retries, mTLS, telemetry) out
@@ -30,6 +33,26 @@ mTLS, applies routing, load balances, retries, and emits telemetry.
 3. **Injection webhook**: mutates pod specs to add the sidecar.
 
 istiod computes config and identity; Envoys enforce it.
+
+```mermaid
+flowchart TB
+  subgraph CP["Control plane · istiod"]
+    Pilot["Pilot<br/>watch + render + push"]
+    CA["CA<br/>workload mTLS certs"]
+    WH["Injection webhook"]
+  end
+  subgraph DP["Data plane"]
+    subgraph C["Client pod (2/2)"]
+      capp["app"] --> cproxy["istio-proxy"]
+    end
+    subgraph S["Server pod (2/2)"]
+      sproxy["istio-proxy"] --> sapp["app"]
+    end
+    cproxy -- "mTLS" --> sproxy
+  end
+  Pilot -. "xDS (LDS/RDS/CDS/EDS)" .-> cproxy
+  Pilot -. "xDS" .-> sproxy
+```
 
 ## How the sidecar gets there (injection)
 
@@ -72,6 +95,16 @@ L7 routing happens at the **caller's** Envoy; mTLS and inbound authz at the
 **callee's**. Canary weighting is enforced by the client proxy, security by the
 server proxy.
 
+```mermaid
+flowchart LR
+  req["request"] --> gw["Gateway<br/>open port + host"]
+  gw --> vs["VirtualService<br/>route · split · retry · timeout"]
+  vs --> dr["DestinationRule<br/>subset · LB · pool · outlier"]
+  dr --> sec["PeerAuth + AuthorizationPolicy<br/>mTLS · allow / deny"]
+  sec --> app["app"]
+  app --> tel["Telemetry<br/>metrics · traces · logs"]
+```
+
 ## The config resources (what maps to what)
 
 Every Istio CRD is really "generate this Envoy config":
@@ -94,6 +127,37 @@ Every Istio CRD is really "generate this Envoy config":
 
 Mental split: **VirtualService = routing, DestinationRule = the pool/policy of
 what you routed to, Gateway = the edge, Peer/AuthorizationPolicy = security.**
+
+## The full CRD catalog
+
+**Traffic management** (`networking.istio.io`)
+
+| CRD | Purpose | Key abilities | Acts at |
+|-----|---------|---------------|---------|
+| `Gateway` | Open ports/hosts on the edge Envoy | ports, TLS termination, host/SNI | edge gateway |
+| `VirtualService` | L7 routing rulebook | weight split, retries, timeouts, fault, mirror, rewrite | client proxy + gateway |
+| `DestinationRule` | Policy for the chosen destination | subsets, load balancing, connection pool, outlier detection, upstream TLS | client proxy |
+| `ServiceEntry` | Add external services to the registry | register hosts, egress control | mesh registry |
+| `Sidecar` | Scope a proxy's config and egress | limit config, egress hosts, cut proxy memory | per ns/workload |
+| `WorkloadEntry` | Register a VM as a mesh endpoint | non-pod identity + endpoint | mesh registry |
+| `WorkloadGroup` | Template that auto-registers VMs | VM autoregistration, health probes | mesh registry |
+| `EnvoyFilter` | Patch raw Envoy config (escape hatch) | custom filters, low-level tuning | any proxy |
+| `ProxyConfig` | Proxy runtime settings | concurrency, image, env | proxy runtime |
+
+**Security** (`security.istio.io`)
+
+| CRD | Purpose | Key abilities | Acts at |
+|-----|---------|---------------|---------|
+| `PeerAuthentication` | Workload mTLS mode | STRICT / PERMISSIVE / DISABLE, per-port | server proxy |
+| `RequestAuthentication` | Validate end-user JWTs | JWKS/issuer, expose claims | server proxy (L7) |
+| `AuthorizationPolicy` | Allow/deny who calls what | ALLOW/DENY by identity, claim, method, path; CUSTOM ext-authz | server proxy |
+
+**Telemetry and extensibility** (`telemetry.istio.io`, `extensions.istio.io`)
+
+| CRD | Purpose | Key abilities | Acts at |
+|-----|---------|---------------|---------|
+| `Telemetry` | Shape metrics/traces/logs | trace sampling, metric overrides, access logs, provider select | any proxy |
+| `WasmPlugin` | Load a Wasm filter into proxies | custom L7 logic, OCI modules, phase ordering | any proxy |
 
 ## Traffic management the app never sees
 
