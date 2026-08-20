@@ -1,0 +1,41 @@
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: elk
+  namespace: elk
+spec:
+  version: 8.19.4
+  count: 1
+  elasticsearchRef:
+    name: elk
+  config:
+    server.publicBaseUrl: http://localhost:15601
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
+  podTemplate:
+    spec:
+      containers:
+        - name: kibana
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-nodeport
+  namespace: elk
+spec:
+  type: NodePort
+  selector:
+    kibana.k8s.elastic.co/name: elk
+  ports:
+    - name: http
+      port: 5601
+      targetPort: 5601
+      nodePort: 30601

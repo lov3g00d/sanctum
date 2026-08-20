@@ -1,0 +1,52 @@
+apiVersion: logstash.k8s.elastic.co/v1alpha1
+kind: Logstash
+metadata:
+  name: elk
+  namespace: elk
+spec:
+  version: 8.19.4
+  count: 1
+  elasticsearchRefs:
+    - name: elk
+      clusterName: elk
+  podTemplate:
+    spec:
+      containers:
+        - name: logstash
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: 500m
+            limits:
+              memory: 1536Mi
+  pipelines:
+    - pipeline.id: main
+      config.string: |
+        input {
+          beats { port => 5044 }
+        }
+        filter {
+          grok {
+            match => { "message" => "%{WORD:level} %{NUMBER:status:int} %{WORD:method} %{DATA:req_path} %{NUMBER:latency_ms:int}ms %{GREEDYDATA:log_message}" }
+          }
+        }
+        output {
+          elasticsearch {
+            hosts => [ "${ELK_ES_HOSTS}" ]
+            user => "${ELK_ES_USER}"
+            password => "${ELK_ES_PASSWORD}"
+            ssl_enabled => true
+            ssl_certificate_authorities => "${ELK_ES_SSL_CERTIFICATE_AUTHORITY}"
+            index => "logstash-app-%{+YYYY.MM.dd}"
+          }
+        }
+  services:
+    - name: beats
+      service:
+        spec:
+          type: ClusterIP
+          ports:
+            - port: 5044
+              name: filebeat
+              protocol: TCP
+              targetPort: 5044

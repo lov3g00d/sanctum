@@ -1,0 +1,96 @@
+version: '3'
+
+vars:
+  KIND_CLUSTER: elk
+  NS: elk
+  ECK_VERSION: 3.5.0
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: kind + ECK + Elasticsearch, Kibana, Logstash, Filebeat + the log generator
+    cmds:
+      - task: kind-up
+      - task: image
+      - task: operator
+      - task: elastic
+      - task: pipeline
+      - task: creds
+
+  kind-up:
+    desc: Create the kind cluster (skips if it exists)
+    status:
+      - kind get clusters | grep -qx {{.KIND_CLUSTER}}
+    cmds:
+      - kind create cluster --config kind/cluster.yaml
+
+  image:
+    desc: Build the log-generator image and load it into kind
+    cmds:
+      - docker build -t loggen:dev app/
+      - kind load docker-image loggen:dev --name {{.KIND_CLUSTER}}
+
+  operator:
+    desc: Install the ECK operator and wait for it to be ready
+    cmds:
+      - kubectl create -f https://download.elastic.co/downloads/eck/{{.ECK_VERSION}}/crds.yaml
+      - kubectl apply -f https://download.elastic.co/downloads/eck/{{.ECK_VERSION}}/operator.yaml
+      - kubectl -n elastic-system rollout status statefulset/elastic-operator --timeout=120s
+
+  elastic:
+    desc: Deploy Elasticsearch + Kibana, wait for green/yellow health
+    cmds:
+      - kubectl apply -f k8s/elasticsearch.yaml
+      - kubectl apply -f k8s/kibana.yaml
+      - |
+        echo "waiting for Elasticsearch health..."
+        until kubectl -n {{.NS}} get elasticsearch elk -o jsonpath='{.status.health}' | grep -qE 'green|yellow'; do sleep 8; done
+        kubectl -n {{.NS}} get elasticsearch elk -o jsonpath='Elasticsearch health: {.status.health}{"\n"}'
+
+  pipeline:
+    desc: Deploy Logstash, Filebeat, and the log generator
+    cmds:
+      - kubectl apply -f k8s/logstash.yaml
+      - |
+        echo "waiting for Logstash..."
+        until kubectl -n {{.NS}} get pod -l logstash.k8s.elastic.co/name=elk | grep -q '1/1'; do sleep 8; done
+      - kubectl apply -f k8s/app.yaml
+      - kubectl apply -f k8s/filebeat.yaml
+      - kubectl -n {{.NS}} rollout status deploy/loggen --timeout=120s
+
+  creds:
+    desc: Print the Kibana URL and the elastic user password
+    silent: true
+    cmds:
+      - |
+        PW=$(kubectl -n {{.NS}} get secret elk-es-elastic-user -o jsonpath='{.data.elastic}' | base64 -d)
+        echo "kibana = http://localhost:15601   (elastic / $PW)"
+
+  status:
+    desc: Elasticsearch health and the logstash-app index doc counts by level
+    silent: true
+    cmds:
+      - bash scripts/status.sh
+
+  break:
+    desc: Flip the app to emit ERROR / HTTP 500 log lines
+    cmds:
+      - kubectl -n {{.NS}} exec deploy/loggen -- python -c "import urllib.request,json; urllib.request.urlopen(urllib.request.Request('http://localhost:8080/config',data=json.dumps({'healthy':False}).encode(),headers={'Content-Type':'application/json'},method='POST'))"
+
+  heal:
+    desc: Flip the app back to healthy INFO / HTTP 200 log lines
+    cmds:
+      - kubectl -n {{.NS}} exec deploy/loggen -- python -c "import urllib.request,json; urllib.request.urlopen(urllib.request.Request('http://localhost:8080/config',data=json.dumps({'healthy':True}).encode(),headers={'Content-Type':'application/json'},method='POST'))"
+
+  logs-demo:
+    desc: Break the app, then find the parsed ERROR/500 logs in Elasticsearch
+    cmds:
+      - bash scripts/logs-demo.sh
+
+  down:
+    desc: Delete the kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER}}
