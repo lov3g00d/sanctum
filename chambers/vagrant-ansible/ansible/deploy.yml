@@ -1,0 +1,40 @@
+---
+# Zero-downtime rolling deploy: one web node at a time, drained from HAProxy
+# through the admin stats socket (delegated to the load balancer) before the
+# app is redeployed, then re-enabled once it is healthy again.
+- name: Rolling application deploy
+  hosts: webservers
+  become: true
+  serial: 1
+  max_fail_percentage: 0
+  tasks:
+    - name: Drain the node from the load balancer, host {{ inventory_hostname }}
+      community.general.haproxy:
+        state: disabled
+        host: "{{ inventory_hostname }}"
+        backend: "{{ haproxy_backend_name }}"
+        socket: /run/haproxy/admin.sock
+        drain: true
+        wait: true
+      delegate_to: "{{ groups['loadbalancers'][0] }}"
+
+    - name: Redeploy the application
+      ansible.builtin.include_role:
+        name: webapp
+
+    - name: Wait for the app to report healthy
+      ansible.builtin.uri:
+        url: "http://{{ private_ip }}:{{ app_port }}/healthz"
+        status_code: 200
+      register: health
+      retries: 10
+      delay: 3
+      until: health.status == 200
+
+    - name: Re-enable the node in the load balancer, host {{ inventory_hostname }}
+      community.general.haproxy:
+        state: enabled
+        host: "{{ inventory_hostname }}"
+        backend: "{{ haproxy_backend_name }}"
+        socket: /run/haproxy/admin.sock
+      delegate_to: "{{ groups['loadbalancers'][0] }}"

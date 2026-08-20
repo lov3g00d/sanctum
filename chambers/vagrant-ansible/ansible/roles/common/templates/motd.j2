@@ -1,0 +1,6 @@
+{{ ansible_facts['hostname'] | upper }} - sanctum vagrant-ansible lab
+role        : {{ group_names | join(', ') }}
+os          : {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
+private ip  : {{ private_ip }}
+
+Managed by Ansible. Manual changes will be overwritten on the next run.

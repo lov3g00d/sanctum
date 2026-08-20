@@ -1,0 +1,80 @@
+version: '3'
+
+vars:
+  LB_IP: 192.168.56.10
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: Bring up the 4 VMs and provision the whole stack with Ansible
+    cmds:
+      - task: vms
+      - task: ssh-config
+      - task: collections
+      - task: provision
+      - task: demo
+
+  vms:
+    desc: vagrant up the libvirt VMs (lb, web1, web2, db)
+    cmds:
+      - vagrant up --provider=libvirt
+
+  ssh-config:
+    desc: Regenerate the SSH config Ansible uses to reach the VMs
+    cmds:
+      - vagrant ssh-config 2>/dev/null | sed -n '/^Host /,$p' > ansible/.ssh_config
+
+  collections:
+    desc: Install the required Ansible collections
+    dir: ansible
+    cmds:
+      - ansible-galaxy collection install -r requirements.yml -p ./collections
+
+  provision:
+    desc: Run the full Ansible playbook (idempotent - a second run should be all green/ok)
+    dir: ansible
+    cmds:
+      - ansible-playbook site.yml
+
+  ping:
+    desc: Ansible connectivity check to all VMs
+    dir: ansible
+    cmds:
+      - ansible all -m ping
+
+  deploy:
+    desc: "Zero-downtime rolling deploy (VERSION=x task deploy; default 2.0)"
+    dir: ansible
+    cmds:
+      - ansible-playbook deploy.yml -e app_version={{.VERSION | default "2.0"}}
+
+  rolling-demo:
+    desc: Curl the LB continuously while a rolling deploy runs, then report non-200s
+    cmds:
+      - bash scripts/rolling-demo.sh {{.VERSION | default "2.0"}}
+
+  demo:
+    desc: Curl the load balancer a few times to show round-robin + the DB value
+    silent: true
+    cmds:
+      - |
+        echo "requests through the load balancer ({{.LB_IP}}):"
+        for _ in $(seq 1 6); do
+          curl -s --max-time 3 http://{{.LB_IP}}/ \
+            | python3 -c 'import sys,json; d=json.load(sys.stdin); print("  host=%s version=%s db_message=%s" % (d.get("host"), d.get("version"), d.get("db_message")))' \
+            || echo "  (request failed)"
+        done
+
+  vault-edit:
+    desc: Edit the encrypted vault
+    dir: ansible
+    cmds:
+      - ansible-vault edit group_vars/all/vault.yml
+
+  down:
+    desc: Destroy the VMs
+    cmds:
+      - vagrant destroy -f

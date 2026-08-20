@@ -1,0 +1,35 @@
+# A 4-VM lab on libvirt, provisioned entirely by Ansible (see ansible/).
+# Two networks per guest: eth0 is Vagrant's management NAT (SSH + outbound for
+# apt/pip), eth1 is an isolated private network (forward_mode none) that carries
+# the app traffic between lb, web, and db. The host holds .1 on the private
+# bridge, so `task demo` can curl the load balancer directly.
+
+NODES = {
+  "lb"   => { ip: "192.168.56.10", mem: 512,  cpus: 1 },
+  "web1" => { ip: "192.168.56.11", mem: 768,  cpus: 1 },
+  "web2" => { ip: "192.168.56.12", mem: 768,  cpus: 1 },
+  "db"   => { ip: "192.168.56.13", mem: 1024, cpus: 1 },
+}
+
+Vagrant.configure("2") do |config|
+  config.vm.box         = "generic/debian12"
+  config.vm.box_version = "4.3.12"
+
+  # No shared folder: Ansible reaches the guests over SSH, nothing is mounted.
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  NODES.each do |name, opts|
+    config.vm.define name do |node|
+      node.vm.hostname = name
+      node.vm.network :private_network,
+        ip: opts[:ip],
+        libvirt__forward_mode: "none",
+        libvirt__network_name: "sanctum-lab"
+
+      node.vm.provider :libvirt do |lv|
+        lv.memory = opts[:mem]
+        lv.cpus   = opts[:cpus]
+      end
+    end
+  end
+end

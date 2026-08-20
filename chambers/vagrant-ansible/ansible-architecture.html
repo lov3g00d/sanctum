@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vagrant + Ansible - VM lab architecture</title>
+<style>
+  :root {
+    --bg: #f7f6f5;
+    --panel: #ffffff;
+    --panel-2: #f0eeec;
+    --ink: #1b1917;
+    --ink-soft: #5b544f;
+    --line: #e6e2df;
+    --accent: #c0392b;
+    --accent-soft: #f7e4e1;
+    --vagrant: #1868b7;
+    --lb: #b5730b;
+    --web: #2563c9;
+    --db: #0b8f9e;
+    --ok: #1f9d57;
+    --mono: "JetBrains Mono", "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131110; --panel: #1c1a18; --panel-2: #252220; --ink: #ece8e4; --ink-soft: #a8a09a; --line: #302c29;
+      --accent: #f2695a; --accent-soft: #2a1512; --vagrant: #5a9bff; --lb: #e0a83a; --web: #5a9bff; --db: #2bc0d0; --ok: #35c07a;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#f7f6f5; --panel:#fff; --panel-2:#f0eeec; --ink:#1b1917; --ink-soft:#5b544f; --line:#e6e2df;
+    --accent:#c0392b; --accent-soft:#f7e4e1; --vagrant:#1868b7; --lb:#b5730b; --web:#2563c9; --db:#0b8f9e; --ok:#1f9d57;
+  }
+  :root[data-theme="dark"] {
+    --bg:#131110; --panel:#1c1a18; --panel-2:#252220; --ink:#ece8e4; --ink-soft:#a8a09a; --line:#302c29;
+    --accent:#f2695a; --accent-soft:#2a1512; --vagrant:#5a9bff; --lb:#e0a83a; --web:#5a9bff; --db:#2bc0d0; --ok:#35c07a;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.55; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1080px; margin:0 auto; padding:48px 24px 80px; }
+
+  .eyebrow { font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin:0 0 10px; }
+  h1 { font-family:var(--mono); font-weight:700; font-size:clamp(28px,5vw,44px); line-height:1.05; margin:0 0 14px; letter-spacing:-.01em; text-wrap:balance; }
+  h2 { font-family:var(--mono); font-size:20px; letter-spacing:-.01em; margin:0 0 4px; }
+  .lead { font-size:18px; color:var(--ink-soft); max-width:64ch; margin:0 0 8px; }
+  section { margin-top:56px; }
+  .sec-head { border-top:1px solid var(--line); padding-top:28px; margin-bottom:22px; }
+  .sec-head .eyebrow { color:var(--ink-soft); }
+  .sec-head p { margin:6px 0 0; color:var(--ink-soft); max-width:68ch; }
+
+  code,.mono { font-family:var(--mono); font-size:.9em; }
+  code { background:var(--panel-2); padding:1px 6px; border-radius:5px; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
+  .chip { font-family:var(--mono); font-size:12px; display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:var(--panel); }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .d-lb{background:var(--lb);} .d-web{background:var(--web);} .d-db{background:var(--db);}
+
+  .callout { background:var(--accent-soft); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:12px; padding:20px 22px; margin-top:24px; }
+  .callout strong { color:var(--accent); }
+
+  .grid { display:grid; gap:14px; }
+  .cols-3 { grid-template-columns:repeat(3,1fr); }
+  .cols-2 { grid-template-columns:repeat(2,1fr); }
+  @media (max-width:820px){ .cols-3,.cols-2{grid-template-columns:1fr;} }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .card .tag { font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; padding:3px 8px; border-radius:999px; display:inline-block; margin-bottom:10px; color:var(--ink-soft); background:var(--panel-2); }
+  .card h3 { font-family:var(--mono); font-size:15px; margin:0 0 6px; }
+  .card p { margin:0; font-size:14px; color:var(--ink-soft); }
+  .card .meta { font-family:var(--mono); font-size:11px; color:var(--ink-soft); margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
+
+  /* topology */
+  .topo { display:flex; flex-direction:column; align-items:center; gap:0; margin-top:8px; }
+  .box { border:1px solid var(--line); border-radius:10px; padding:12px 16px; text-align:center; background:var(--panel); min-width:150px; }
+  .box .bt { font-family:var(--mono); font-weight:700; font-size:14px; }
+  .box .bs { font-size:11px; color:var(--ink-soft); font-family:var(--mono); }
+  .box.lb{border-color:var(--lb);} .box.web{border-color:var(--web);} .box.db{border-color:var(--db);} .box.host{border-style:dashed;}
+  .vconn { width:2px; height:20px; background:var(--line); }
+  .webrow { display:flex; gap:20px; }
+  .fan { position:relative; height:20px; width:100%; }
+
+  /* two-layer split */
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:820px){ .split{grid-template-columns:1fr;} }
+  .layer { border:1px solid var(--line); border-radius:12px; padding:18px; background:var(--panel); }
+  .layer.vagrant{border-top:3px solid var(--vagrant);} .layer.ansible{border-top:3px solid var(--accent);}
+  .layer h3 { font-family:var(--mono); font-size:15px; margin:0 0 4px; }
+  .layer .owns { font-size:11px; font-family:var(--mono); text-transform:uppercase; letter-spacing:.1em; color:var(--ink-soft); margin-bottom:10px; }
+  .layer ul { margin:0; padding-left:18px; } .layer li { font-size:14px; color:var(--ink-soft); margin-bottom:6px; }
+
+  /* flow */
+  .flow { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin-top:8px; }
+  .node { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; min-width:110px; text-align:center; flex:1; }
+  .node .n-name { font-family:var(--mono); font-weight:700; font-size:13px; }
+  .node .n-sub { font-size:11px; color:var(--ink-soft); }
+  .arrow { align-self:center; padding:0 8px; color:var(--accent); font-family:var(--mono); font-size:13px; }
+  @media (max-width:820px){ .flow{flex-direction:column;} .arrow{transform:rotate(90deg); padding:8px 0;} }
+
+  /* precedence ladder */
+  .ladder { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+  .rung { display:flex; align-items:center; gap:12px; border:1px solid var(--line); border-radius:8px; padding:9px 14px; background:var(--panel); font-family:var(--mono); font-size:13px; }
+  .rung .w { font-size:10px; color:var(--ink-soft); margin-left:auto; text-transform:uppercase; letter-spacing:.08em; }
+  .rung.top { border-color:var(--accent); }
+
+  .tbl-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:12px; margin-top:8px; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th,td { text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); }
+  th { font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); background:var(--panel-2); }
+  tr:last-child td { border-bottom:none; }
+
+  footer { margin-top:64px; border-top:1px solid var(--line); padding-top:22px; font-size:13px; color:var(--ink-soft); }
+  footer code { font-size:12px; }
+  .theme-toggle { position:fixed; top:14px; right:14px; font-family:var(--mono); font-size:11px; background:var(--panel); border:1px solid var(--line); color:var(--ink-soft); border-radius:999px; padding:6px 12px; cursor:pointer; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="var r=document.documentElement;var d=(r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));r.setAttribute('data-theme',d==='dark'?'light':'dark');">toggle theme</button>
+<div class="wrap">
+
+  <p class="eyebrow">Config management / vagrant-ansible chamber</p>
+  <h1>Vagrant + Ansible: a real machine, described in code</h1>
+  <p class="lead">Vagrant conjures the VMs; Ansible turns bare Debian into a running three-tier app over SSH, with no agent on the guests. This is Ansible's honest demo: real hosts, real services, described declaratively and re-runnable to the same end state.</p>
+  <div class="legend">
+    <span class="chip"><span class="dot d-lb"></span>lb / HAProxy</span>
+    <span class="chip"><span class="dot d-web"></span>web / Flask</span>
+    <span class="chip"><span class="dot d-db"></span>db / PostgreSQL</span>
+  </div>
+
+  <div class="callout">
+    <strong>The one idea.</strong> Ansible is <em>agentless</em> configuration management. The control node connects over SSH, gathers facts, and pushes each host toward a described state with idempotent modules. Nothing runs on the guests; the repo is the source of truth. Run it twice and the second run changes nothing.
+  </div>
+
+  <!-- TOPOLOGY -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Architecture</p>
+      <h2>The topology</h2>
+      <p>Four VMs, three tiers. A load balancer round-robins two web servers that read from one database, all on an isolated private network. The host reaches the load balancer directly.</p>
+    </div>
+    <div class="topo">
+      <div class="box host"><div class="bt">host</div><div class="bs">curl :80</div></div>
+      <div class="vconn"></div>
+      <div class="box lb"><div class="bt">lb</div><div class="bs">HAProxy · .10</div></div>
+      <div class="vconn"></div>
+      <div class="webrow">
+        <div class="box web"><div class="bt">web1</div><div class="bs">Flask · .11</div></div>
+        <div class="box web"><div class="bt">web2</div><div class="bs">Flask · .12</div></div>
+      </div>
+      <div class="vconn"></div>
+      <div class="box db"><div class="bt">db</div><div class="bs">PostgreSQL · .13</div></div>
+    </div>
+  </section>
+
+  <!-- TWO LAYERS -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Two tools, two jobs</p>
+      <h2>Vagrant provisions, Ansible configures</h2>
+      <p>The clean split: Vagrant owns the machines and the network; Ansible owns everything inside the operating system. They meet at SSH.</p>
+    </div>
+    <div class="split">
+      <div class="layer vagrant">
+        <h3>Vagrant (+ libvirt)</h3>
+        <div class="owns">owns: the machines</div>
+        <ul>
+          <li>Defines the four VMs from one <code>Vagrantfile</code> (box, memory, cpus).</li>
+          <li>Two NICs per guest: a management NAT for SSH and outbound, an isolated private network for app traffic.</li>
+          <li>Boots them on the libvirt (KVM) hypervisor and manages SSH keys.</li>
+          <li>Lifecycle: <code>up</code>, <code>ssh-config</code>, <code>destroy</code>.</li>
+        </ul>
+      </div>
+      <div class="layer ansible">
+        <h3>Ansible</h3>
+        <div class="owns">owns: the software</div>
+        <ul>
+          <li>Connects over SSH using Vagrant's generated config, gathers facts.</li>
+          <li>Applies four roles idempotently: base, database, app, load balancer.</li>
+          <li>Templates config, manages packages/services, wires the tiers together.</li>
+          <li>Re-runnable: a second run is all green.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONCEPTS -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Concepts</p>
+      <h2>The Ansible building blocks</h2>
+    </div>
+    <div class="grid cols-3">
+      <div class="card"><span class="tag">inventory</span><h3>Inventory &amp; groups</h3><p>Hosts organized into groups (<code>loadbalancers</code>, <code>webservers</code>, <code>databases</code>) with a nested <code>webstack</code> child group. Plays target a group; each host carries a <code>private_ip</code>.</p></div>
+      <div class="card"><span class="tag">role</span><h3>Roles</h3><p>Reusable units with <code>tasks/</code>, <code>handlers/</code>, <code>templates/</code>, <code>defaults/</code>. Four here: <code>common</code>, <code>postgresql</code>, <code>webapp</code>, <code>haproxy</code>.</p></div>
+      <div class="card"><span class="tag">tasks</span><h3>Tasks &amp; handlers</h3><p>Tasks converge state with modules. Handlers run once at play end, only if notified, for reactions to change (restart the app, reload HAProxy). <code>flush_handlers</code> forces a restart mid-role.</p></div>
+      <div class="card"><span class="tag">jinja2</span><h3>Templates</h3><p>Jinja2 with full access to facts and vars. The MOTD renders from facts; the app env file from the Vault password; the HAProxy config from the inventory.</p></div>
+      <div class="card"><span class="tag">secrets</span><h3>Ansible Vault</h3><p>The DB password is encrypted in <code>vault.yml</code> and referenced by a non-secret name (the vault-indirection pattern). It is load-bearing: a least-privilege DB user is created with it and the app connects with it.</p></div>
+      <div class="card"><span class="tag">plugin</span><h3>Custom filter</h3><p>A filter plugin (<code>haproxy_backends</code>) turns the <code>webservers</code> group into HAProxy <code>server</code> lines, looking each private IP up in <code>hostvars</code>. Logic that belongs in code, not a template.</p></div>
+      <div class="card"><span class="tag">galaxy</span><h3>Collections</h3><p>External modules pulled via <code>requirements.yml</code>: <code>community.postgresql</code> for the DB, <code>community.general</code> for ufw/haproxy/timezone, <code>ansible.posix</code>.</p></div>
+      <div class="card"><span class="tag">tags</span><h3>Tags</h3><p>Each role is tagged (<code>common</code>, <code>db</code>, <code>web</code>, <code>lb</code>), so a single tier can be applied with <code>--tags</code> instead of the whole play.</p></div>
+      <div class="card"><span class="tag">delegation</span><h3>Delegation</h3><p><code>delegate_to</code> runs a task on a different host than the play targets. The rolling deploy drains a web node by running the HAProxy module <em>on the load balancer</em>.</p></div>
+    </div>
+  </section>
+
+  <!-- PROVISION FLOW -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">The provision</p>
+      <h2>How a bare VM becomes a tier</h2>
+      <p><code>site.yml</code> runs four plays in dependency order. Each is <code>become: true</code> and applies one role to one group.</p>
+    </div>
+    <div class="flow">
+      <div class="node"><div class="n-name">common</div><div class="n-sub">all hosts</div></div>
+      <div class="arrow">&#8594;</div>
+      <div class="node"><div class="n-name">postgresql</div><div class="n-sub">db</div></div>
+      <div class="arrow">&#8594;</div>
+      <div class="node"><div class="n-name">webapp</div><div class="n-sub">web1, web2</div></div>
+      <div class="arrow">&#8594;</div>
+      <div class="node"><div class="n-name">haproxy</div><div class="n-sub">lb</div></div>
+    </div>
+    <p style="color:var(--ink-soft);font-size:14px;margin-top:12px;"><b>common</b>: base packages, a deploy user, MOTD from facts, ufw (allow SSH first, then default-deny), sshd hardening. <b>postgresql</b>: install + psycopg2, listen on all interfaces, pg_hba scram rule, then create the DB, a least-privilege user, the table, grants, and seed. <b>webapp</b>: Flask app + a Vault-templated env file + a systemd unit. <b>haproxy</b>: config generated from the inventory, health checks, admin stats socket.</p>
+  </section>
+
+  <!-- VARIABLE PRECEDENCE -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Variables</p>
+      <h2>Precedence, low to high</h2>
+      <p>When the same variable is set in more than one place, the highest wins. This is why <code>task deploy</code> can override <code>app_version</code> at run time.</p>
+    </div>
+    <div class="ladder">
+      <div class="rung">role defaults <span class="w">lowest</span></div>
+      <div class="rung">inventory / group_vars <span class="w">group</span></div>
+      <div class="rung">host_vars <span class="w">host</span></div>
+      <div class="rung">play vars <span class="w">play</span></div>
+      <div class="rung top">extra-vars (<code>-e</code>) <span class="w">highest</span></div>
+    </div>
+  </section>
+
+  <!-- NETWORKS -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Networking</p>
+      <h2>Two networks, on purpose</h2>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Network</th><th>Interface</th><th>Carries</th><th>Reachability</th></tr></thead>
+        <tbody>
+          <tr><td>Management NAT</td><td class="mono">eth0</td><td>SSH (Ansible) + outbound (apt/pip)</td><td>guest to internet via NAT</td></tr>
+          <tr><td>Isolated private</td><td class="mono">eth1</td><td>app traffic (lb to web, web to db)</td><td>guests + host only, <code>forward_mode: none</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="color:var(--ink-soft);font-size:14px;margin-top:12px;">Ansible reaches the guests over the management NAT; the app tiers talk over the isolated <code>192.168.56.0/24</code>. The host holds <code>.1</code> on that bridge, so it can curl the load balancer. ufw allows the app ports only from the private subnet.</p>
+  </section>
+
+  <!-- ROLLING DEPLOY -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">The advanced piece</p>
+      <h2>Zero-downtime rolling deploy</h2>
+      <p><code>deploy.yml</code> with <code>serial: 1</code> processes one web node at a time. Live traffic never hits a restarting app, because the node leaves the load balancer first.</p>
+    </div>
+    <div class="flow">
+      <div class="node"><div class="n-name">drain</div><div class="n-sub">disable in HAProxy</div></div>
+      <div class="arrow">&#8594;</div>
+      <div class="node"><div class="n-name">redeploy</div><div class="n-sub">new version</div></div>
+      <div class="arrow">&#8594;</div>
+      <div class="node"><div class="n-name">health</div><div class="n-sub">wait /healthz 200</div></div>
+      <div class="arrow">&#8594;</div>
+      <div class="node"><div class="n-name">re-enable</div><div class="n-sub">back in rotation</div></div>
+    </div>
+    <div class="callout" style="margin-top:16px;">
+      <strong>Why it is zero-downtime.</strong> The drain and re-enable talk to HAProxy's <b>admin stats socket</b>, run <code>delegate_to</code> the load balancer (the task executes on the lb, not the web node). Naive <code>serial</code> + restart would 5xx in the window before health checks eject the node. Verified: a curl loop through the whole deploy = <b>zero non-200</b>, version flips live.
+    </div>
+  </section>
+
+  <!-- IDEMPOTENCE -->
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">The promise</p>
+      <h2>Idempotence</h2>
+      <p>Running the playbook twice reports zero changes on the second run. That is the whole point of describing state instead of scripting steps.</p>
+    </div>
+    <div class="grid cols-3">
+      <div class="card"><h3 class="mono">apt update</h3><p>Marked <code>changed_when: false</code> so a cache refresh is never a "change".</p></div>
+      <div class="card"><h3 class="mono">CREATE TABLE</h3><p>Uses the idempotent <code>postgresql_table</code> module, not a raw query that always reports changed.</p></div>
+      <div class="card"><h3 class="mono">seed row</h3><p><code>INSERT ... ON CONFLICT DO NOTHING</code> with <code>changed_when</code> tied to the row count.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    Grounded in the <code>vagrant-ansible</code> chamber: <code>task up</code> boots the VMs and runs the full provision, <code>task demo</code> shows the load balancer round-robin the two web nodes, and <code>task rolling-demo</code> proves the zero-downtime deploy. HAProxy stats at <code>http://192.168.56.10:8404/</code>. See <code>ansible.md</code> for the prose deep-dive.
+  </footer>
+</div>
+</body>
+</html>

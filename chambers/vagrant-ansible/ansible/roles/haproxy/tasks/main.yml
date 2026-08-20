@@ -1,0 +1,32 @@
+---
+- name: Install HAProxy
+  ansible.builtin.apt:
+    name: haproxy
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Template haproxy.cfg (backends from the webservers group)
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "haproxy -c -f %s"
+  notify: Reload haproxy
+
+- name: Open HTTP and the stats port through ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "{{ haproxy_stats_port }}"
+
+- name: Ensure HAProxy is running and enabled
+  ansible.builtin.systemd:
+    name: haproxy
+    state: started
+    enabled: true

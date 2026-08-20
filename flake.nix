@@ -15,7 +15,7 @@
         pkgs = import nixpkgs {
           inherit system;
           config.allowUnfreePredicate = pkg:
-            builtins.elem (nixpkgs.lib.getName pkg) [ "terraform" ];
+            builtins.elem (nixpkgs.lib.getName pkg) [ "terraform" "vagrant" ];
           # ecdsa is a transitive build-time dep of the Python security tooling
           # (checkov/semgrep), flagged insecure upstream. Dev-shell only, never
           # shipped to a runtime image.
@@ -45,6 +45,13 @@
             kind      # local Kubernetes for the kind-kafka chamber
             kcat      # Kafka producer/consumer CLI
             go-task   # task runner (Taskfile)
+
+            # VM lab + config management (vagrant-ansible chamber).
+            # vagrant is unfree (BSL) and bundles vagrant-libvirt as a system
+            # plugin; libvirtd itself is a host prerequisite (nixos-rebuild).
+            vagrant
+            ansible
+            ansible-lint
 
             # Supply-chain security
             cosign

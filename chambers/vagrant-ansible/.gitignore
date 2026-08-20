@@ -1,0 +1,5 @@
+.vagrant/
+ansible/.ssh_config
+ansible/collections/
+*.retry
+ansible/filter_plugins/__pycache__/

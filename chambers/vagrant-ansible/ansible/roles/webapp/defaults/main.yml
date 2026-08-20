@@ -1,0 +1,2 @@
+---
+webapp_app_dir: "/opt/{{ app_name }}"

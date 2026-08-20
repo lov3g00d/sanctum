@@ -1,0 +1,40 @@
+---
+- name: Base configuration on every host
+  hosts: all
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Assert the guests are Debian
+      ansible.builtin.assert:
+        that: ansible_facts['os_family'] == 'Debian'
+        fail_msg: "This lab targets Debian guests"
+
+    - name: Assert the custom filter plugin is loaded
+      ansible.builtin.assert:
+        that:
+          - "(['web1'] | haproxy_backends({'web1': {'private_ip': '10.0.0.1'}}, 8080) | length) == 1"
+        fail_msg: "custom haproxy_backends filter plugin failed to load"
+  roles:
+    - role: common
+      tags: [common]
+
+- name: Database tier
+  hosts: databases
+  become: true
+  roles:
+    - role: postgresql
+      tags: [db]
+
+- name: Web tier
+  hosts: webservers
+  become: true
+  roles:
+    - role: webapp
+      tags: [web]
+
+- name: Load balancer tier
+  hosts: loadbalancers
+  become: true
+  roles:
+    - role: haproxy
+      tags: [lb]

@@ -1,0 +1,103 @@
+---
+- name: Install PostgreSQL and the Python driver
+  ansible.builtin.apt:
+    name: "{{ postgresql_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure PostgreSQL is running and enabled
+  ansible.builtin.service:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Listen on all interfaces (conf.d drop-in)
+  ansible.builtin.copy:
+    dest: "{{ postgresql_conf_dir }}/conf.d/10-listen.conf"
+    content: "listen_addresses = '*'\n"
+    owner: postgres
+    group: postgres
+    mode: "0644"
+  notify: Restart postgresql
+
+- name: Allow the app user from the web subnet (scram-sha-256)
+  community.postgresql.postgresql_pg_hba:
+    dest: "{{ postgresql_conf_dir }}/pg_hba.conf"
+    contype: host
+    databases: "{{ db_name }}"
+    users: "{{ db_app_user }}"
+    source: "{{ web_subnet }}"
+    method: scram-sha-256
+    create: true
+  become: true
+  become_user: postgres
+  notify: Restart postgresql
+
+# Apply listen_addresses + pg_hba before we create roles the app will use.
+- name: Apply pending PostgreSQL restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Create the application database
+  community.postgresql.postgresql_db:
+    name: "{{ db_name }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create the least-privilege application user
+  community.postgresql.postgresql_user:
+    name: "{{ db_app_user }}"
+    password: "{{ db_app_password }}"
+    login_db: "{{ db_name }}"
+    state: present
+  become: true
+  become_user: postgres
+
+- name: Create the messages table
+  community.postgresql.postgresql_table:
+    login_db: "{{ db_name }}"
+    name: messages
+    columns:
+      - id serial PRIMARY KEY
+      - body text NOT NULL UNIQUE
+  become: true
+  become_user: postgres
+
+- name: Grant the app user SELECT/INSERT on messages
+  community.postgresql.postgresql_privs:
+    login_db: "{{ db_name }}"
+    role: "{{ db_app_user }}"
+    privs: SELECT,INSERT
+    type: table
+    objs: messages
+  become: true
+  become_user: postgres
+
+- name: Grant the app user usage on the id sequence
+  community.postgresql.postgresql_privs:
+    login_db: "{{ db_name }}"
+    role: "{{ db_app_user }}"
+    privs: USAGE,SELECT
+    type: sequence
+    objs: messages_id_seq
+  become: true
+  become_user: postgres
+
+- name: Seed the message row (idempotent)
+  community.postgresql.postgresql_query:
+    login_db: "{{ db_name }}"
+    query: "INSERT INTO messages (body) VALUES (%s) ON CONFLICT (body) DO NOTHING"
+    positional_args:
+      - "{{ lab_message }}"
+  become: true
+  become_user: postgres
+  register: postgresql_seed
+  changed_when: (postgresql_seed.rowcount | default(0)) > 0
+
+- name: Allow PostgreSQL from the web subnet through ufw
+  community.general.ufw:
+    rule: allow
+    port: "5432"
+    proto: tcp
+    src: "{{ web_subnet }}"

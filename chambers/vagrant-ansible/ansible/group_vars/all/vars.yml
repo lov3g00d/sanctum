@@ -1,0 +1,21 @@
+---
+# App identity
+app_name: sanctumapp
+app_port: 8080
+app_version: "1.0"
+
+# Database, reached over the isolated private network. db_host resolves to the
+# private_ip of the (single) host in the databases group.
+db_name: appdb
+db_app_user: appuser
+db_host: "{{ hostvars[groups['databases'][0]].private_ip }}"
+
+# Vault indirection: the real value lives encrypted in vault.yml as
+# vault_db_app_password; this non-secret name references it, so playbooks and
+# templates use db_app_password and the secret stays out of plaintext.
+db_app_password: "{{ vault_db_app_password }}"
+
+web_subnet: "192.168.56.0/24"
+lab_message: "hello from the sanctum vagrant-ansible lab"
+deploy_user: deploy
+haproxy_backend_name: webservers

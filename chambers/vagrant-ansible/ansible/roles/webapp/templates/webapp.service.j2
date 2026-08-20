@@ -1,0 +1,14 @@
+[Unit]
+Description={{ app_name }} Flask app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ deploy_user }}
+EnvironmentFile={{ webapp_app_dir }}/app.env
+ExecStart=/usr/bin/python3 {{ webapp_app_dir }}/app.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

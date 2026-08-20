@@ -1,0 +1,3 @@
+---
+postgresql_version: 15
+postgresql_conf_dir: "/etc/postgresql/15/main"

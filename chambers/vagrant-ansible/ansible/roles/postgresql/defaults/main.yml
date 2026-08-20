@@ -1,0 +1,6 @@
+---
+postgresql_packages:
+  - postgresql
+  - postgresql-client
+  # psycopg2 must be present BEFORE any community.postgresql module runs
+  - python3-psycopg2

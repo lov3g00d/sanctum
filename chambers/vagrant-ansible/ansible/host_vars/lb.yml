@@ -1,0 +1,5 @@
+---
+# Demonstrates host_vars overriding at the single-host level: the load balancer
+# exposes a stats page with these credentials (lab only).
+haproxy_stats_user: admin
+haproxy_stats_password: statsadmin

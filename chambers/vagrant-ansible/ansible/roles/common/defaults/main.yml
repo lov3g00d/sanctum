@@ -1,0 +1,7 @@
+---
+common_base_packages:
+  - vim
+  - curl
+  - ca-certificates
+  - ufw
+common_timezone: UTC
