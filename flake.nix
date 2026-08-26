@@ -84,11 +84,24 @@
             # App runtimes (sample services)
             python312
             nodejs_22
+
+            # AI/LLM stack (local-sre-copilot chamber): local model serving + a uv-managed
+            # Python venv (the AI libraries move too fast for nixpkgs). The vector
+            # store is Qdrant in qdrant-client's embedded local mode (in the venv),
+            # so no separate server is needed.
+            ollama
+            uv
           ];
 
           shellHook = ''
             echo "sanctum shell"
             echo "terraform $(terraform version -json | jq -r .terraform_version) | $(kubectl version --client -o json 2>/dev/null | jq -r .clientVersion.gitVersion)"
+            # Binary Python wheels (pydantic-core, numpy, tokenizers, ...) need
+            # libstdc++/zlib at runtime; NixOS has no FHS linker, so expose them
+            # for the uv venv the local-sre-copilot chamber uses.
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib pkgs.zlib ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            # Keep uv on the nix Python instead of downloading its own CPython.
+            export UV_PYTHON_DOWNLOADS=never
           '';
         };
       });

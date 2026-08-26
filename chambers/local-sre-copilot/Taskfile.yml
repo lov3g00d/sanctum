@@ -1,0 +1,42 @@
+version: '3'
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: Start everything (Ollama + models + ingest + MCP server + API)
+    cmds:
+      - bash scripts/up.sh
+
+  down:
+    desc: Stop the app services (MCP + API); leaves Ollama running
+    cmds:
+      - bash scripts/down.sh
+
+  down-all:
+    desc: Stop everything including Ollama
+    cmds:
+      - bash scripts/down.sh --all
+
+  ingest:
+    desc: Re-ingest the corpus (stops the MCP server first to free the store)
+    cmds:
+      - bash scripts/down.sh
+      - uv run python -m app.ingest
+
+  ask:
+    desc: 'Ask the copilot a question: task ask -- "why is checkout failing?"'
+    cmds:
+      - uv run python -m app.ask {{.CLI_ARGS}}
+
+  demo:
+    desc: Ask the sample incident question
+    cmds:
+      - uv run python -m app.ask "checkout is throwing 500s, diagnose it and tell me the fix"
+
+  logs:
+    desc: Tail the service logs
+    cmds:
+      - tail -n 40 .run/mcp.log .run/api.log

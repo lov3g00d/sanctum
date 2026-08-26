@@ -21,6 +21,7 @@ pieces they draw on. It is built for practice and prototyping, not as a product.
 | [`kind-elk`](chambers/kind-elk/) | Elastic Stack on kind via the ECK operator: a log generator shipped by Filebeat, parsed by a Logstash grok filter, stored in Elasticsearch, explored in Kibana; break the app and find the errors by field query |
 | [`vagrant-ansible`](chambers/vagrant-ansible/) | A 4-VM three-tier app on libvirt provisioned by a complex Ansible project: HAProxy + two Flask web servers + PostgreSQL, with roles, Vault, a custom filter plugin, and a zero-downtime rolling deploy |
 | [`vagrant-windows`](chambers/vagrant-windows/) | A Windows Server VM on libvirt configured by Ansible over WinRM: installs IIS, serves a templated page, creates a user, and runs PowerShell via the win_* modules |
+| [`local-sre-copilot`](chambers/local-sre-copilot/) | A fully local SRE on-call copilot (prototype): RAG over runbooks + an MCP tool server + a LangGraph multi-agent supervisor (Ollama + embedded Qdrant), diagnoses an incident and proposes a cited fix |
 
 Each chamber is self-contained, with its own README covering prerequisites, stand-up,
 tear-down, and what it demonstrates. Adding one is additive: a new environment is a new
