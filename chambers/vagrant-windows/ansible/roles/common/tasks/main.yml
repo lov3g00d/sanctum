@@ -1,0 +1,25 @@
+---
+- name: Set the timezone
+  ansible.windows.win_timezone:
+    timezone: UTC
+
+- name: Create a local application user
+  ansible.windows.win_user:
+    name: "{{ app_user }}"
+    password: "{{ app_user_password }}"
+    password_never_expires: true
+    state: present
+    groups:
+      - Users
+
+- name: Run an idempotent PowerShell provisioning step
+  ansible.windows.win_powershell:
+    script: |
+      $marker = "C:\sanctum\provisioned.txt"
+      if (Test-Path $marker) {
+        $Ansible.Changed = $false
+      } else {
+        New-Item -ItemType Directory -Force -Path (Split-Path $marker) | Out-Null
+        "provisioned by ansible on $(hostname)" | Out-File -FilePath $marker -Encoding utf8
+        $Ansible.Changed = $true
+      }

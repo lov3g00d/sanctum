@@ -1,0 +1,65 @@
+version: '3'
+
+vars:
+  WIN_IP: 192.168.57.10
+
+env:
+  # Windows Server boots via UEFI; vagrant-libvirt finds the OVMF firmware here.
+  # On NixOS these paths exist when virtualisation.libvirtd.qemu.ovmf.enable = true.
+  VAGRANT_LIBVIRT_OVMF_CODE: /run/libvirt/nix-ovmf/edk2-x86_64-code.fd
+  VAGRANT_LIBVIRT_OVMF_VARS: /run/libvirt/nix-ovmf/edk2-i386-vars.fd
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: Boot the Windows Server VM and configure it with Ansible over WinRM
+    cmds:
+      - task: vms
+      - task: collections
+      - task: provision
+      - task: demo
+
+  vms:
+    desc: vagrant up the Windows Server VM (large first download)
+    cmds:
+      - vagrant up --provider=libvirt
+
+  collections:
+    desc: Install the Windows Ansible collections
+    dir: ansible
+    cmds:
+      - ansible-galaxy collection install -r requirements.yml -p ./collections
+
+  provision:
+    desc: Run the Ansible playbook against the Windows host (idempotent)
+    dir: ansible
+    cmds:
+      - ansible-playbook site.yml
+
+  ping:
+    desc: WinRM connectivity check (win_ping, not the SSH ping)
+    dir: ansible
+    cmds:
+      - ansible windows -m ansible.windows.win_ping
+
+  psinfo:
+    desc: Run a PowerShell command over WinRM (OS name and version)
+    dir: ansible
+    cmds:
+      - ansible windows -m ansible.windows.win_powershell -a 'script="Get-ComputerInfo | Select-Object WindowsProductName, OsVersion | Format-List"'
+
+  demo:
+    desc: Curl the IIS page served by the Windows VM
+    silent: true
+    cmds:
+      - |
+        echo "IIS on the Windows Server ({{.WIN_IP}}):"
+        curl -s --max-time 5 http://{{.WIN_IP}}/ | grep -iE '<title>|Served by|App user' | sed 's/^/  /' || echo "  (request failed)"
+
+  down:
+    desc: Destroy the VM
+    cmds:
+      - vagrant destroy -f

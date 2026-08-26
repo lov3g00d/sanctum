@@ -20,6 +20,7 @@ pieces they draw on. It is built for practice and prototyping, not as a product.
 | [`kind-icinga`](chambers/kind-icinga/) | Icinga on kind: the check-and-notify stack (Icinga 2 + Icinga DB + Icinga Web 2) monitoring an app, with a check driven to CRITICAL and a notification, config pushed via the REST API |
 | [`kind-elk`](chambers/kind-elk/) | Elastic Stack on kind via the ECK operator: a log generator shipped by Filebeat, parsed by a Logstash grok filter, stored in Elasticsearch, explored in Kibana; break the app and find the errors by field query |
 | [`vagrant-ansible`](chambers/vagrant-ansible/) | A 4-VM three-tier app on libvirt provisioned by a complex Ansible project: HAProxy + two Flask web servers + PostgreSQL, with roles, Vault, a custom filter plugin, and a zero-downtime rolling deploy |
+| [`vagrant-windows`](chambers/vagrant-windows/) | A Windows Server VM on libvirt configured by Ansible over WinRM: installs IIS, serves a templated page, creates a user, and runs PowerShell via the win_* modules |
 
 Each chamber is self-contained, with its own README covering prerequisites, stand-up,
 tear-down, and what it demonstrates. Adding one is additive: a new environment is a new

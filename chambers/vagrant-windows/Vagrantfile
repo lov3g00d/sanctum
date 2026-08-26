@@ -1,0 +1,30 @@
+# A single Windows Server VM on libvirt, managed by Ansible over WinRM (see
+# ansible/). The box ships with WinRM enabled; Vagrant uses it as the
+# communicator. An isolated private network carries WinRM + HTTP; the host holds
+# .1 on that bridge, so it can reach the VM directly.
+
+Vagrant.configure("2") do |config|
+  config.vm.box         = "gusztavvargadr/windows-server"
+  config.vm.box_version = "2607.0.0"
+
+  config.vm.communicator = "winrm"
+  config.winrm.username  = "vagrant"
+  config.winrm.password  = "vagrant"
+
+  # No shared folder: Windows guests have no rsync, and Ansible reaches the VM
+  # over WinRM, nothing is mounted.
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.network :private_network,
+    ip: "192.168.57.10",
+    libvirt__forward_mode: "none",
+    libvirt__network_name: "sanctum-win"
+
+  config.vm.provider :libvirt do |lv|
+    lv.memory = 4096
+    lv.cpus   = 2
+    # Windows Server boots via UEFI. vagrant-libvirt locates the OVMF firmware
+    # through VAGRANT_LIBVIRT_OVMF_CODE (set in the Taskfile to the host's NixOS
+    # firmware path), so nothing is hardcoded here.
+  end
+end

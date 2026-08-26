@@ -1,0 +1,14 @@
+---
+# Ansible manages Windows over WinRM, not SSH. These are the well-known Vagrant
+# lab credentials; in production the password would come from Vault.
+ansible_connection: winrm
+ansible_user: vagrant
+ansible_password: vagrant
+ansible_port: 5985
+ansible_winrm_transport: basic
+ansible_winrm_server_cert_validation: ignore
+
+# App-level vars
+app_user: appadmin
+app_user_password: "P@ssw0rd-Lab-123"
+site_title: "Sanctum Windows Lab"

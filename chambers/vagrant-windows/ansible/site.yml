@@ -1,0 +1,11 @@
+---
+- name: Configure the Windows Server
+  hosts: windows
+  gather_facts: true
+  roles:
+    - role: common
+      tags: [common]
+    - role: iis
+      tags: [iis]
+    - role: tools
+      tags: [tools]

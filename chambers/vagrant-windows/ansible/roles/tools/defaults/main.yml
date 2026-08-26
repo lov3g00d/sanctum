@@ -1,0 +1,5 @@
+---
+# Developer tools installed via Chocolatey (win_chocolatey bootstraps choco).
+tools_packages:
+  - powershell-core   # PowerShell 7 (pwsh)
+  - vscode            # Visual Studio Code

@@ -21,6 +21,15 @@
           # shipped to a runtime image.
           config.permittedInsecurePackages = [ "python3.14-ecdsa-0.19.2" ];
         };
+        # Ansible with pywinrm in its OWN dependency closure, so the winrm
+        # connection plugin (the ansible interpreter, not a sibling python) can
+        # import it and manage the Windows guest in the vagrant-windows chamber.
+        # withPackages does not work here: the `ansible` console script keeps its
+        # ansible-core shebang and never sees a sibling pywinrm.
+        ansibleEnv = pkgs.ansible.overridePythonAttrs (old: {
+          propagatedBuildInputs =
+            (old.propagatedBuildInputs or [ ]) ++ [ pkgs.python3Packages.pywinrm ];
+        });
       in
       {
         devShells.default = pkgs.mkShell {
@@ -50,7 +59,7 @@
             # vagrant is unfree (BSL) and bundles vagrant-libvirt as a system
             # plugin; libvirtd itself is a host prerequisite (nixos-rebuild).
             vagrant
-            ansible
+            ansibleEnv   # ansible + pywinrm (Linux + Windows/WinRM chambers)
             ansible-lint
 
             # Supply-chain security

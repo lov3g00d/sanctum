@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{ site_title }}</title></head>
+<body style="font-family: system-ui; max-width: 40rem; margin: 4rem auto;">
+  <h1>{{ site_title }}</h1>
+  <p>Served by <strong>IIS</strong> on <code>{{ inventory_hostname }}</code> (Windows Server).</p>
+  <p>Provisioned by Ansible over WinRM. App user: <code>{{ app_user }}</code>.</p>
+</body>
+</html>

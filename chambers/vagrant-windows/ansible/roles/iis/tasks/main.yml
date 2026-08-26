@@ -1,0 +1,32 @@
+---
+- name: Install IIS (Web-Server role)
+  ansible.windows.win_feature:
+    name: Web-Server
+    include_management_tools: true
+    state: present
+  register: iis_feature
+
+- name: Reboot if the feature install requires it
+  ansible.windows.win_reboot:
+  when: iis_feature.reboot_required
+
+- name: Ensure the IIS service is running
+  ansible.windows.win_service:
+    name: W3SVC
+    state: started
+    start_mode: auto
+
+- name: Deploy the web page
+  ansible.windows.win_template:
+    src: index.html.j2
+    dest: C:\inetpub\wwwroot\index.html
+
+- name: Allow HTTP (80) inbound through Windows Firewall
+  community.windows.win_firewall_rule:
+    name: "Allow HTTP 80"
+    localport: 80
+    action: allow
+    direction: in
+    protocol: tcp
+    enabled: true
+    state: present

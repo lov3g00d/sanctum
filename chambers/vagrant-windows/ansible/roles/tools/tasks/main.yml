@@ -1,0 +1,17 @@
+---
+- name: Install developer tools via Chocolatey
+  chocolatey.chocolatey.win_chocolatey:
+    name: "{{ tools_packages }}"
+    state: present
+
+- name: List installed VS Code extensions
+  ansible.windows.win_shell: code --list-extensions
+  register: vscode_extensions
+  changed_when: false
+  failed_when: false
+
+- name: Install the VS Code PowerShell extension
+  ansible.windows.win_shell: code --install-extension ms-vscode.powershell
+  when:
+    - vscode_extensions.rc == 0
+    - "'ms-vscode.powershell' not in vscode_extensions.stdout"
