@@ -1,0 +1,7 @@
+.venv/
+.palace/
+.run/
+# init writes generated config/state into the mined corpus dir; keep corpus/ as
+# committed inputs only.
+corpus/mempalace.yaml
+corpus/.mempalace/

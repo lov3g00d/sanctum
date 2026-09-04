@@ -1,0 +1,58 @@
+version: '3'
+
+vars:
+  PALACE: .palace
+  CORPUS: corpus
+  WING: sanctum
+
+env:
+  PALACE: '{{.PALACE}}'
+  CORPUS: '{{.CORPUS}}'
+  WING: '{{.WING}}'
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: Install MemPalace (uv sync) and build the palace from corpus/
+    cmds:
+      - uv sync
+      - bash scripts/build.sh
+      - 'echo "Palace built. Try:  task test   |   task search -- \"checkout latency\""'
+
+  test:
+    desc: Deterministic recall check - fixed queries must return the right memory (PASS/FAIL)
+    cmds:
+      - bash scripts/test.sh
+
+  search:
+    desc: 'Search the palace: task search -- "why did we switch to graphql"'
+    cmds:
+      - uv run mempalace --palace {{.PALACE}} search {{.CLI_ARGS}}
+
+  status:
+    desc: Show what has been filed, by wing and room
+    cmds:
+      - uv run mempalace --palace {{.PALACE}} status
+
+  wake-up:
+    desc: Show the compact wake-up context MemPalace hands an agent at session start
+    cmds:
+      - uv run mempalace --palace {{.PALACE}} wake-up
+
+  mcp:
+    desc: Print the command to connect this palace to Claude Code over MCP (does not edit your config)
+    cmds:
+      - uv run mempalace --palace {{.PALACE}} mcp
+
+  down:
+    desc: Delete the generated palace and config; keeps corpus/ and .venv/
+    cmds:
+      - bash scripts/down.sh
+
+  clean:
+    desc: Tear down and also remove the uv venv
+    cmds:
+      - bash scripts/down.sh --clean

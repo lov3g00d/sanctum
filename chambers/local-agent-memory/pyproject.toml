@@ -1,0 +1,15 @@
+[project]
+name = "local-agent-memory"
+version = "0.1.0"
+description = "End-to-end lab for MemPalace: local, no-API-key agent memory (verbatim store + semantic search) over a seed corpus."
+requires-python = ">=3.12,<3.14"
+
+# MemPalace is the whole point of the chamber; pin it to a major/minor and let uv
+# resolve the rest (chromadb, onnxruntime, the local embedding model). The office-
+# document extras (mempalace[extract]) are not needed: the corpus is Markdown.
+dependencies = [
+    "mempalace>=3.9,<4",
+]
+
+[tool.uv]
+package = false

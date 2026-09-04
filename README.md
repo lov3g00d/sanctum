@@ -22,6 +22,7 @@ pieces they draw on. It is built for practice and prototyping, not as a product.
 | [`vagrant-ansible`](chambers/vagrant-ansible/) | A 4-VM three-tier app on libvirt provisioned by a complex Ansible project: HAProxy + two Flask web servers + PostgreSQL, with roles, Vault, a custom filter plugin, and a zero-downtime rolling deploy |
 | [`vagrant-windows`](chambers/vagrant-windows/) | A Windows Server VM on libvirt configured by Ansible over WinRM: installs IIS, serves a templated page, creates a user, and runs PowerShell via the win_* modules |
 | [`local-llm`](chambers/local-llm/) | A local-LLM playground: Ollama serving a model behind an OpenAI-compatible API, a tool-calling round-trip, and a benchmark that reports real tokens/sec on your hardware (no GPU required) |
+| [`local-agent-memory`](chambers/local-agent-memory/) | A local, no-API-key agent memory (MemPalace): a seed corpus is mined into an on-machine palace, then a fixed query set proves recall as a PASS/FAIL matrix; MCP-wireable into Claude Code |
 | [`local-sre-copilot`](chambers/local-sre-copilot/) | A fully local SRE on-call copilot (prototype): RAG over runbooks + an MCP tool server + a LangGraph multi-agent supervisor (Ollama + embedded Qdrant), diagnoses an incident and proposes a cited fix |
 
 Each chamber is self-contained, with its own README covering prerequisites, stand-up,
