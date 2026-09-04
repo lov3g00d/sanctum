@@ -1,0 +1,74 @@
+version: '3'
+
+# The model to talk to. Override per invocation, e.g.
+#   task chat MODEL=qwen3:4b        task bench MODEL=qwen2.5-coder:7b
+vars:
+  MODEL: qwen3:8b
+  HOST: 127.0.0.1:11434
+
+env:
+  OLLAMA_HOST: '{{.HOST}}'
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: Start the Ollama server (if needed) and pull the default model
+    cmds:
+      - bash scripts/up.sh {{.MODEL}}
+      - 'echo "Ready. Try:  task chat   |   task api   |   task tools   |   task bench"'
+
+  chat:
+    desc: 'Interactive REPL with the model (default {{.MODEL}}): task chat'
+    cmds:
+      - ollama run {{.MODEL}}
+
+  ask:
+    desc: 'One-shot prompt: task ask -- "explain a kubernetes readiness probe"'
+    cmds:
+      - ollama run {{.MODEL}} {{.CLI_ARGS}}
+
+  api:
+    desc: Prove the OpenAI-compatible endpoint (POST /v1/chat/completions with curl)
+    cmds:
+      - bash scripts/api.sh {{.MODEL}}
+
+  tools:
+    desc: Watch a full tool-calling round-trip (model requests a function, we run it, it answers)
+    cmds:
+      - bash scripts/tool-call.sh {{.MODEL}}
+
+  bench:
+    desc: 'Measure prefill and decode tokens/sec on this machine: task bench'
+    cmds:
+      - bash scripts/bench.sh {{.MODEL}}
+
+  compare:
+    desc: 'Same prompt, two models, side by side: task compare A=qwen3:4b B=qwen3:8b'
+    cmds:
+      - bash scripts/compare.sh "{{.A}}" "{{.B}}"
+    vars:
+      A: qwen3:4b
+      B: qwen3:8b
+
+  pull:
+    desc: Pull the curated CPU-friendly model set (see README for sizes)
+    cmds:
+      - for: [qwen3:4b, qwen3:8b, qwen2.5-coder:7b, gemma3:4b]
+        cmd: ollama pull {{.ITEM}}
+
+  status:
+    desc: Show server version, installed models, and what is loaded in memory
+    cmds:
+      - 'echo "server: $(curl -s http://{{.HOST}}/api/version | jq -r .version)"'
+      - echo "installed:"
+      - curl -s http://{{.HOST}}/api/tags | jq -r '.models[] | "  \(.name)  (\(.size/1e9|floor)GB)"'
+      - echo "loaded:"
+      - curl -s http://{{.HOST}}/api/ps | jq -r '.models[]?.name | "  \(.)"'
+
+  down:
+    desc: Stop the Ollama server if this chamber started it (leaves pulled models on disk)
+    cmds:
+      - bash scripts/down.sh
