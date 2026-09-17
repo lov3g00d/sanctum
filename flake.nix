@@ -51,7 +51,8 @@
             kubernetes-helm
             kustomize
             trivy
-            kind      # local Kubernetes for the kind-kafka chamber
+            kind      # local Kubernetes for the kind-* chambers
+            k8sgpt    # LLM-backed Kubernetes triage (kind-k8sgpt chamber)
             kcat      # Kafka producer/consumer CLI
             go-task   # task runner (Taskfile)
 

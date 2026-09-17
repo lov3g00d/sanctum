@@ -1,0 +1,83 @@
+version: '3'
+
+vars:
+  KIND_CLUSTER: k8sgpt
+  CTX: kind-k8sgpt
+  NS: k8sgpt-demo
+  K8SGPT_CFG: .run/k8sgpt.yaml
+  MODEL: qwen2.5:7b
+  OLLAMA_BASEURL: http://localhost:11434
+
+env:
+  KIND_CLUSTER: '{{.KIND_CLUSTER}}'
+  CTX: '{{.CTX}}'
+  NS: '{{.NS}}'
+  K8SGPT_CFG: '{{.K8SGPT_CFG}}'
+  MODEL: '{{.MODEL}}'
+  OLLAMA_BASEURL: '{{.OLLAMA_BASEURL}}'
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: kind cluster + a deliberately broken workload + k8sgpt wired to local Ollama
+    cmds:
+      - bash scripts/up.sh
+      - 'echo "Ready. Try:  task analyze  |  task explain  |  task test"'
+
+  analyze:
+    desc: k8sgpt findings, no LLM (fast, deterministic)
+    cmds:
+      - k8sgpt --config {{.K8SGPT_CFG}} --kubecontext {{.CTX}} analyze -n {{.NS}}
+
+  explain:
+    desc: k8sgpt findings explained in plain English by the local model (needs Ollama)
+    cmds:
+      - ollama pull {{.MODEL}}
+      - k8sgpt --config {{.K8SGPT_CFG}} --kubecontext {{.CTX}} analyze -n {{.NS}} --backend ollama --explain
+
+  mcp:
+    desc: Print the command to expose k8sgpt to Claude Code as an MCP server (does not edit your config)
+    cmds:
+      - bash scripts/mcp.sh
+
+  test:
+    desc: Deterministic check - k8sgpt must find both planted faults (PASS/FAIL)
+    cmds:
+      - bash scripts/test.sh
+
+  fix:
+    desc: Repair the broken deployment, then re-analyze to watch the problem clear
+    cmds:
+      - kubectl --context {{.CTX}} -n {{.NS}} set image deploy/broken-image app=registry.k8s.io/pause:3.9
+      - kubectl --context {{.CTX}} -n {{.NS}} rollout status deploy/broken-image --timeout=60s
+      - k8sgpt --config {{.K8SGPT_CFG}} --kubecontext {{.CTX}} analyze -n {{.NS}}
+
+  status:
+    desc: Show the demo namespace
+    cmds:
+      - kubectl --context {{.CTX}} -n {{.NS}} get pods,svc
+
+  operator:
+    desc: Install the k8sgpt operator (continuous in-cluster scanning into Result CRDs)
+    cmds:
+      - bash scripts/operator-up.sh
+
+  operator-results:
+    desc: Show the Result CRDs the operator produced from its scans
+    cmds:
+      - kubectl --context {{.CTX}} get results -A
+      - 'echo "--- detail of one result: ---"'
+      - kubectl --context {{.CTX}} -n k8sgpt-operator-system get results -o jsonpath='{range .items[*]}{.spec.kind}{"  "}{.spec.name}{"\n    "}{.spec.error[0].text}{"\n"}{end}'
+
+  operator-down:
+    desc: Remove the operator and its namespace (keeps the cluster and workload)
+    cmds:
+      - bash scripts/operator-down.sh
+
+  down:
+    desc: Delete the kind cluster and chamber-local config
+    cmds:
+      - bash scripts/down.sh

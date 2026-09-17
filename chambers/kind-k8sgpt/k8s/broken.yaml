@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k8sgpt-demo
+---
+# Deliberately broken: the image tag does not exist, so the pod wedges in
+# ImagePullBackOff. k8sgpt's Pod analyzer reports the pull failure.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-image
+  namespace: k8sgpt-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-image
+  template:
+    metadata:
+      labels:
+        app: broken-image
+    spec:
+      containers:
+        - name: app
+          image: registry.k8s.io/pause:this-tag-does-not-exist
+---
+# Deliberately broken: the selector matches no running pods, so the Service has
+# no endpoints. k8sgpt's Service analyzer reports it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: orphan-svc
+  namespace: k8sgpt-demo
+spec:
+  selector:
+    app: nobody-runs-this
+  ports:
+    - port: 80
+      targetPort: 80

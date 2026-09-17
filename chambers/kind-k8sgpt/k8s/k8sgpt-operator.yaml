@@ -1,0 +1,20 @@
+# Analysis-only operator config: the operator continuously scans the cluster and
+# writes findings as Result CRDs, with no LLM call. ai.enabled is false because
+# the operator runs inside kind and cannot reach the host's Ollama through the
+# NixOS firewall; the LLM-explained variant is a documented opt-in (see k8sgpt.md).
+apiVersion: core.k8sgpt.ai/v1alpha1
+kind: K8sGPT
+metadata:
+  name: k8sgpt
+  namespace: k8sgpt-operator-system
+spec:
+  ai:
+    # Disabled: analysis-only, no LLM call. `localai` is the OpenAI-compatible
+    # backend value the operator accepts (it has no native `ollama` value yet);
+    # it also names the opt-in AI path in k8sgpt.md, where baseUrl would point at
+    # Ollama's /v1 endpoint.
+    enabled: false
+    backend: localai
+  noCache: true
+  repository: ghcr.io/k8sgpt-ai/k8sgpt
+  version: v0.4.36
