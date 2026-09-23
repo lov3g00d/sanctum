@@ -1,13 +1,16 @@
 version: '3'
 
-# The model to talk to. Override per invocation, e.g.
-#   task chat MODEL=qwen3:4b        task bench MODEL=qwen2.5-coder:7b
+# The one model for both `task chat` and `task claude`. Override per invocation,
+# e.g. task chat MODEL=qwen3:4b   |   task claude MODEL=qwen2.5:14b
 vars:
-  MODEL: qwen3:8b
+  MODEL: gemma4:12b
   HOST: 127.0.0.1:11434
 
 env:
   OLLAMA_HOST: '{{.HOST}}'
+  # Set the context window once on the server so every model loads with room for
+  # Claude Code's agent loop (tool schemas + history overflow Ollama's small default).
+  OLLAMA_CONTEXT_LENGTH: '16384'
 
 tasks:
   default:
@@ -18,7 +21,7 @@ tasks:
     desc: Start the Ollama server (if needed) and pull the default model
     cmds:
       - bash scripts/up.sh {{.MODEL}}
-      - 'echo "Ready. Try:  task chat   |   task api   |   task tools   |   task bench"'
+      - 'echo "Ready. Try:  task chat   |   task claude"'
 
   chat:
     desc: 'Interactive REPL with the model (default {{.MODEL}}): task chat'
@@ -30,28 +33,15 @@ tasks:
     cmds:
       - ollama run {{.MODEL}} {{.CLI_ARGS}}
 
-  api:
-    desc: Prove the OpenAI-compatible endpoint (POST /v1/chat/completions with curl)
+  claude:
+    desc: 'Drive Claude Code with the local model, no cloud: task claude -- "explain this repo"'
+    env:
+      ANTHROPIC_BASE_URL: 'http://{{.HOST}}'
+      ANTHROPIC_AUTH_TOKEN: ollama
+      ANTHROPIC_MODEL: '{{.MODEL}}'
+      ANTHROPIC_SMALL_FAST_MODEL: '{{.MODEL}}'
     cmds:
-      - bash scripts/api.sh {{.MODEL}}
-
-  tools:
-    desc: Watch a full tool-calling round-trip (model requests a function, we run it, it answers)
-    cmds:
-      - bash scripts/tool-call.sh {{.MODEL}}
-
-  bench:
-    desc: 'Measure prefill and decode tokens/sec on this machine: task bench'
-    cmds:
-      - bash scripts/bench.sh {{.MODEL}}
-
-  compare:
-    desc: 'Same prompt, two models, side by side: task compare A=qwen3:4b B=qwen3:8b'
-    cmds:
-      - bash scripts/compare.sh "{{.A}}" "{{.B}}"
-    vars:
-      A: qwen3:4b
-      B: qwen3:8b
+      - claude {{.CLI_ARGS}}
 
   pull:
     desc: Pull the curated CPU-friendly model set (see README for sizes)

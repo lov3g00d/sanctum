@@ -22,9 +22,6 @@ first:
   Expect single to low-double-digit tok/s for a 7-8B model, and it drops roughly linearly as
   the model grows. Usable for chat and short agent turns; slow for long generations.
 
-`task bench` prints the real prefill and decode numbers for whatever model you point it at, so
-you are deciding on measured behaviour rather than a benchmark table from someone else's rig.
-
 ## The CPU sweet spot: a small model, or a big MoE
 
 Two ways to get good answers without a GPU:
@@ -42,8 +39,7 @@ Two ways to get good answers without a GPU:
 Ollama exposes `/v1/chat/completions` at `http://localhost:11434/v1`, byte-compatible with
 OpenAI's API. That one fact is what makes local models useful rather than a novelty: every
 OpenAI SDK, every coding agent, and chat UIs like Open WebUI take a base URL and an API key,
-so you point them at localhost with a throwaway key and they work unchanged. `task api` shows
-the raw call. To drive an editor agent, set its provider to "OpenAI compatible", base URL
+so you point them at localhost with a throwaway key and they work unchanged. To drive an editor agent, set its provider to "OpenAI compatible", base URL
 `http://localhost:11434/v1`, and the model tag from `task status`.
 
 ## Tool calling is the agent primitive
@@ -51,8 +47,7 @@ the raw call. To drive an editor agent, set its provider to "OpenAI compatible",
 A model that only emits text can advise but not act. Tool calling is the structured protocol
 that lets it *request* an action: you advertise functions (name, description, JSON-schema
 params), the model replies with a call and arguments, your code runs it, and you feed the
-result back for a final answer. `task tools` walks one full round-trip against a local
-`get_weather` function. Everything an "agentic" coding tool does - edit a file, run a test,
+result back for a final answer. Everything an "agentic" coding tool does - edit a file, run a test,
 read output, iterate - is this loop repeated. Note that qwen3 is a hybrid reasoning model; the
 demo sets `think:false` so the tool call is not buried under a reasoning monologue.
 
@@ -73,5 +68,5 @@ differs in the parts that are hardware-specific: on Apple Silicon the fast route
 `mlx-lm`), which runs on the GPU against unified memory. The transferable lesson is the one
 above - unified memory is what lets a MoE model punch above its active-parameter weight - and
 it is exactly why an Apple machine with enough memory is a strong local-inference box. The
-tooling names change; the OpenAI-compatible-endpoint and tool-calling patterns in this chamber
+tooling names change, the OpenAI-compatible-endpoint and tool-calling patterns in this chamber
 do not.
