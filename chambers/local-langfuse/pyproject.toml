@@ -1,0 +1,13 @@
+[project]
+name = "local-langfuse"
+version = "0.1.0"
+description = "Instrument local-llm calls into a self-hosted Langfuse stack and verify a trace round-trips."
+requires-python = ">=3.12,<3.14"
+
+dependencies = [
+    "langfuse>=4.9,<5",
+    "openai>=1.40",
+]
+
+[tool.uv]
+package = false

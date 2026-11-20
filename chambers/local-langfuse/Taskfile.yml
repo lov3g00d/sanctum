@@ -1,0 +1,38 @@
+version: '3'
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  up:
+    desc: Start the self-hosted Langfuse stack and seed a project + API keys
+    cmds:
+      - bash scripts/up.sh
+
+  trace:
+    desc: 'Trace one call to the local-llm model: task trace (MODEL=<tag> to override)'
+    cmds:
+      - bash scripts/trace.sh
+
+  test:
+    desc: Deterministic PASS/FAIL - a trace round-trips SDK -> stack -> public API
+    cmds:
+      - bash scripts/test.sh
+
+  status:
+    desc: Show container health, the UI URL, and the seeded login/keys
+    cmds:
+      - docker compose ps
+      - 'echo "UI: http://localhost:3000"'
+      - '[ -f .env ] && grep -E "^LANGFUSE_INIT_(PROJECT_(PUBLIC|SECRET)_KEY|USER_(EMAIL|PASSWORD))=" .env || echo "(no .env; run task up)"'
+
+  logs:
+    desc: 'Tail stack logs: task logs (SERVICE=langfuse-worker to scope)'
+    cmds:
+      - docker compose logs -f {{.SERVICE}}
+
+  down:
+    desc: Stop the stack, keeping volumes and .env (task down -- --clean wipes them)
+    cmds:
+      - bash scripts/down.sh {{.CLI_ARGS}}

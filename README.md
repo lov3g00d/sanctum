@@ -25,6 +25,7 @@ pieces they draw on. It is built for practice and prototyping, not as a product.
 | [`local-llm`](chambers/local-llm/) | A local-LLM playground: Ollama serving a model behind an OpenAI-compatible API, a tool-calling round-trip, and a benchmark that reports real tokens/sec on your hardware (no GPU required) |
 | [`local-agent-memory`](chambers/local-agent-memory/) | A local, no-API-key agent memory (MemPalace): a seed corpus is mined into an on-machine palace, then a fixed query set proves recall as a PASS/FAIL matrix; MCP-wireable into Claude Code |
 | [`local-sre-copilot`](chambers/local-sre-copilot/) | A fully local SRE on-call copilot (prototype): RAG over runbooks + an MCP tool server + a LangGraph multi-agent supervisor (Ollama + embedded Qdrant), diagnoses an incident and proposes a cited fix |
+| [`local-langfuse`](chambers/local-langfuse/) | Self-hosted Langfuse (LLM observability) over the local-llm model: the full docker-compose stack (web, worker, Postgres, ClickHouse, Redis, MinIO) seeded headless, the `langfuse.openai` wrapper tracing a real local call, and a PASS/FAIL that a trace round-trips SDK → worker → ClickHouse → API |
 
 Each chamber is self-contained, with its own README covering prerequisites, stand-up,
 tear-down, and what it demonstrates. Adding one is additive: a new environment is a new
